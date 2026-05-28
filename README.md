@@ -1,5 +1,6 @@
 # despacho-laboral
-despacholaboral/
+``` plain
+despacho-laboral/
 │
 ├── config/                          # Configuración central
 │   ├── settings.py                  # Base de datos, apps, seguridad
