@@ -5,7 +5,7 @@ Reglas Legales Configurables para Cálculos Laborales Mexicanos
 Tablas legales con valores por defecto actualizados.
 TODO se puede sobreescribir desde LegalConfig en la base de datos.
 
-Autor: Despacho Laboral - Motor Jurídico Parametrizable
+Autor: Conciliacion Laboral Tijuana - Motor Jurídico Parametrizable
 """
 
 from decimal import Decimal

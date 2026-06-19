@@ -5,7 +5,7 @@ Puente entre modelos Django y el Motor Jurídico de Cálculos Laborales
 Conecta los datos de CalculoLaboral / Cliente con core/laboral/calculators.py
 y core/laboral/rules.py.
 
-Autor: Despacho Laboral
+Autor: Conciliacion Laboral Tijuana
 """
 
 from decimal import Decimal

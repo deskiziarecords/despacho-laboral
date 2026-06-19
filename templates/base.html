@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     {% load static %}
-    <title>{% block title %}Despacho Laboral{% endblock %}</title>
+    <title>{% block title %}Conciliacion Laboral Tijuana{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -470,7 +470,7 @@
         <ul id="appleNav">
             <li>
                 <a href="{% url 'dashboard_redirect' %}">
-                    <img src="{% static 'img/logo.png' %}" alt="Despacho Laboral" class="logo-nav">
+                    <img src="{% static 'img/logo.png' %}" alt="Conciliacion Laboral Tijuana" class="logo-nav">
                 </a>
             </li>
             <li class="{% if request.resolver_match.url_name == 'expediente_list' %}active{% endif %}">

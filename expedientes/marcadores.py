@@ -10,7 +10,7 @@ Proporciona:
 - Metadata sobre qué datos están completos y cuáles faltan
 - Inyección de cálculos laborales (aguinaldo, vacaciones, etc.)
 
-Autor: Despacho Laboral - Módulo de Documentos
+Autor: Conciliacion Laboral Tijuana - Módulo de Documentos
 """
 
 import re

@@ -6,7 +6,7 @@ Este módulo NO tiene dependencias de Django.
 Contiene SOLO lógica matemática: recibe números, devuelve números.
 Las reglas legales (días de vacaciones, topes, UMAs) se las pasa quien llama.
 
-Autor: Despacho Laboral - Motor Jurídico Parametrizable
+Autor: Conciliacion Laboral Tijuana - Motor Jurídico Parametrizable
 """
 
 from decimal import Decimal, ROUND_HALF_UP

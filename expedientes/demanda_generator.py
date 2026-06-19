@@ -6,7 +6,7 @@ Genera un documento profesional de Demanda Laboral Mexicana
 con todos los datos del expediente, cálculos integrados y
 formato apto para impresión y firma.
 
-Autor: Despacho Laboral - Módulo de Demandas
+Autor: Conciliacion Laboral Tijuana - Módulo de Demandas
 """
 
 import re

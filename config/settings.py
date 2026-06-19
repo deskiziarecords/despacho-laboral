@@ -16,7 +16,7 @@ env = environ.Env(
     EMAIL_HOST_USER=(str, ''),
     EMAIL_HOST_PASSWORD=(str, ''),
     EMAIL_USE_TLS=(bool, True),
-    DEFAULT_FROM_EMAIL=(str, 'Despacho Laboral <noreply@despacho.com>'),
+    DEFAULT_FROM_EMAIL=(str, 'Conciliacion Laboral Tijuana <noreply@despacho.com>'),
     EMAIL_BACKEND=(str, 'django.core.mail.backends.console.EmailBackend'),
 )
 

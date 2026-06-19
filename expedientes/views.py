@@ -1186,7 +1186,7 @@ Tu solicitud de transferencia para el caso {expediente.numero} ha sido APROBADA.
 El caso ya no aparece en tu bandeja. El nuevo asesor se encargará del seguimiento.
 
 Saludos,
-Sistema de Gestión del Despacho Laboral
+Sistema de Gestión de Conciliacion Laboral Tijuana
 """
 
     # ─── Email al nuevo asesor (se le asignó un nuevo caso) ───
@@ -1208,7 +1208,7 @@ Se te ha asignado un nuevo caso.
 Por favor revisa el expediente para dar continuidad al caso.
 
 Saludos,
-Sistema de Gestión del Despacho Laboral
+Sistema de Gestión de Conciliacion Laboral Tijuana
 """
 
     # Enviar emails

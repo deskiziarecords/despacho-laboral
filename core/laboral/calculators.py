@@ -9,7 +9,7 @@ Combina:
 
 Devuelve diccionarios listos para mostrar en la UI o guardar en CalculoLaboral.
 
-Autor: Despacho Laboral - Motor Jurídico Parametrizable
+Autor: Conciliacion Laboral Tijuana - Motor Jurídico Parametrizable
 """
 
 from decimal import Decimal
