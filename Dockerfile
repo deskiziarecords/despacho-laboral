@@ -63,7 +63,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 # ================================================
 # 4. Instalar Chromium para Playwright
 # ================================================
-RUN python -m playwright install chromium
+RUN uv run playwright install chromium
 
 # ================================================
 # 5. Copiar código de la aplicación
@@ -78,11 +78,11 @@ RUN uv sync --frozen --no-dev
 # ================================================
 # 7. Recolectar archivos estáticos (Whitenoise)
 # ================================================
-RUN python manage.py collectstatic --noinput --clear
+RUN uv run python manage.py collectstatic --noinput --clear
 
 # ================================================
 # 8. Configurar puerto y comando de inicio
 # ================================================
 EXPOSE 8000
 
-CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 3 --timeout 120"]
+CMD ["sh", "-c", "uv run python manage.py migrate --noinput && uv run gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 3 --timeout 120"]
