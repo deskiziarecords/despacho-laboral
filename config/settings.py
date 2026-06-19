@@ -45,6 +45,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -74,7 +75,20 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database (usa DATABASE_URL, ej: postgres://user:pass@host:5432/dbname)
+# Database
+# Soporta DATABASE_URL directa o variables individuales de Railway (PGHOST, PGUSER, etc.)
+_DATABASE_URL = os.environ.get('DATABASE_URL')
+if not _DATABASE_URL and os.environ.get('PGHOST'):
+    # Construir DATABASE_URL desde variables que Railway inyecta automáticamente
+    _DATABASE_URL = "postgres://{user}:{password}@{host}:{port}/{db}".format(
+        user=os.environ['PGUSER'],
+        password=os.environ['PGPASSWORD'],
+        host=os.environ['PGHOST'],
+        port=os.environ.get('PGPORT', '5432'),
+        db=os.environ['PGDATABASE'],
+    )
+    os.environ['DATABASE_URL'] = _DATABASE_URL  # Para que django-environ lo lea
+
 DATABASES = {
     'default': env.db_url('DATABASE_URL')
 }
@@ -92,13 +106,14 @@ TIME_ZONE = 'America/Mexico_City'
 USE_I18N = True
 USE_TZ = True
 
-# Static files
+# Static files (Whitenoise para servir en producción sin Nginx)
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [
     BASE_DIR / 'static',
     ('svg', BASE_DIR / 'svg'),
 ]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Media files
 MEDIA_URL = '/media/'
