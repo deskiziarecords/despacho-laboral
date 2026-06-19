@@ -7,12 +7,6 @@ echo "=== Despacho Laboral - Iniciando ==="
 echo ">>> Ejecutando migraciones..."
 uv run python manage.py migrate --noinput
 
-# 2. Cargar datos existentes (si hay archivo data.json)
-if [ -f data.json ]; then
-    echo ">>> Cargando datos desde data.json..."
-    uv run python manage.py loaddata data.json || echo ">>> Datos ya cargados o error ignorado"
-fi
-
 # 3. Crear superusuario admin (si no existe)
 echo ">>> Verificando superusuario..."
 DJANGO_SUPERUSER_PASSWORD="${DJANGO_SUPERUSER_PASSWORD:-Admin123!}"
