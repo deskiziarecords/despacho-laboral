@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+{% block title %}Eliminar Movimiento - Despacho Laboral{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto">
+    <div class="card">
+        <div class="card-header" style="background: #fef2f2; color: #8b3a3a; border-color: #fecaca;">
+            ⚠️ Confirmar eliminación
+        </div>
+        <div class="card-body text-center py-6">
+            <div class="text-4xl mb-3">🗑️</div>
+            <h2 class="text-lg font-bold text-gray-800 mb-2">¿Eliminar este movimiento?</h2>
+            <div class="bg-gray-50 rounded p-4 inline-block text-left mx-auto mb-4" style="border-radius: 4px;">
+                <table class="text-sm">
+                    <tr>
+                        <td class="text-gray-500 pr-4 py-1">Fecha:</td>
+                        <td class="font-medium">{{ movimiento.fecha|date:"d/m/Y" }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-gray-500 pr-4 py-1">Oficina:</td>
+                        <td class="font-medium">{{ movimiento.oficina.nombre }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-gray-500 pr-4 py-1">Tipo:</td>
+                        <td class="font-medium">
+                            <span class="badge {% if movimiento.tipo == 'ingreso' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+                                {{ movimiento.get_tipo_display }}
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-gray-500 pr-4 py-1">Categoría:</td>
+                        <td class="font-medium">{{ movimiento.get_categoria_display }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-gray-500 pr-4 py-1">Monto:</td>
+                        <td class="font-bold {% if movimiento.tipo == 'ingreso' %}text-green-700{% else %}text-red-700{% endif %}">
+                            ${{ movimiento.monto|floatformat:2|intcomma }}
+                        </td>
+                    </tr>
+                    {% if movimiento.descripcion %}
+                    <tr>
+                        <td class="text-gray-500 pr-4 py-1">Descripción:</td>
+                        <td class="font-medium">{{ movimiento.descripcion|truncatechars:60 }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+            <p class="text-sm text-red-600 mb-4">Esta acción no se puede deshacer.</p>
+
+            <form method="post" class="flex items-center justify-center gap-2">
+                {% csrf_token %}
+                <a href="{% url 'cashmovement_list' %}" class="btn">Cancelar</a>
+                <button type="submit" class="btn btn-danger">🗑️ Sí, eliminar</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

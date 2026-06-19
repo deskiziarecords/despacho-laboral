@@ -1,0 +1,210 @@
+{% extends 'base.html' %}
+{% block title %}{% if object %}Editar{% else %}Nuevo{% endif %} Cliente - Despacho Laboral{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <div class="bg-white rounded shadow-sm border border-gray-200">
+        <div class="px-5 py-3 border-b border-gray-200">
+            <h1 class="text-base font-bold text-gray-800">
+                {% if object %}✏️ Editar Cliente{% else %}👥 Nuevo Cliente{% endif %}
+            </h1>
+        </div>
+        <form method="post" class="p-5 space-y-5">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="p-3 bg-red-50 border border-red-200 rounded-lg">
+                {% for error in form.non_field_errors %}
+                <p class="text-red-600 text-sm">{{ error }}</p>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Datos Personales -->
+            <div>
+                <h2 class="text-sm font-semibold text-gray-800 mb-3 border-b pb-1.5">Datos Personales</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.nombre.label }}</label>
+                        {{ form.nombre }}
+                        {% if form.nombre.errors %}<p class="text-red-500 text-xs mt-1">{{ form.nombre.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.curp.label }}</label>
+                        {{ form.curp }}
+                        {% if form.curp.errors %}<p class="text-red-500 text-xs mt-1">{{ form.curp.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.rfc.label }}</label>
+                        {{ form.rfc }}
+                        {% if form.rfc.errors %}<p class="text-red-500 text-xs mt-1">{{ form.rfc.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.telefono.label }}</label>
+                        {{ form.telefono }}
+                        {% if form.telefono.errors %}<p class="text-red-500 text-xs mt-1">{{ form.telefono.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.whatsapp.label }}</label>
+                        {{ form.whatsapp }}
+                        {% if form.whatsapp.errors %}<p class="text-red-500 text-xs mt-1">{{ form.whatsapp.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.email.label }}</label>
+                        {{ form.email }}
+                        {% if form.email.errors %}<p class="text-red-500 text-xs mt-1">{{ form.email.errors.0 }}</p>{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dirección Particular -->
+            <div>
+                <h2 class="text-sm font-semibold text-gray-800 mb-3 border-b pb-1.5">Dirección Particular</h2>
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.direccion_calle.label }}</label>
+                        {{ form.direccion_calle }}
+                        {% if form.direccion_calle.errors %}<p class="text-red-500 text-xs mt-1">{{ form.direccion_calle.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.direccion_numero.label }}</label>
+                        {{ form.direccion_numero }}
+                        {% if form.direccion_numero.errors %}<p class="text-red-500 text-xs mt-1">{{ form.direccion_numero.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.direccion_cp.label }}</label>
+                        {{ form.direccion_cp }}
+                        {% if form.direccion_cp.errors %}<p class="text-red-500 text-xs mt-1">{{ form.direccion_cp.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div class="md:col-span-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.direccion_colonia.label }}</label>
+                        {{ form.direccion_colonia }}
+                        {% if form.direccion_colonia.errors %}<p class="text-red-500 text-xs mt-1">{{ form.direccion_colonia.errors.0 }}</p>{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Empresa / Patrón -->
+            <div>
+                <h2 class="text-sm font-semibold text-gray-800 mb-3 border-b pb-1.5">Empresa / Patrón</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa.label }}</label>
+                        {{ form.empresa }}
+                        {% if form.empresa.errors %}<p class="text-red-500 text-xs mt-1">{{ form.empresa.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_actividad.label }}</label>
+                        {{ form.empresa_actividad }}
+                        {% if form.empresa_actividad.errors %}<p class="text-red-500 text-xs mt-1">{{ form.empresa_actividad.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_razon_social.label }}</label>
+                        {{ form.empresa_razon_social }}
+                        {% if form.empresa_razon_social.errors %}<p class="text-red-500 text-xs mt-1">{{ form.empresa_razon_social.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_telefono.label }}</label>
+                        {{ form.empresa_telefono }}
+                        {% if form.empresa_telefono.errors %}<p class="text-red-500 text-xs mt-1">{{ form.empresa_telefono.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.rfc.label }}</label>
+                        {{ form.rfc }}
+                        {% if form.rfc.errors %}<p class="text-red-500 text-xs mt-1">{{ form.rfc.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_calle.label }}</label>
+                        {{ form.empresa_calle }}
+                        {% if form.empresa_calle.errors %}<p class="text-red-500 text-xs mt-1">{{ form.empresa_calle.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_numero.label }}</label>
+                        {{ form.empresa_numero }}
+                        {% if form.empresa_numero.errors %}<p class="text-red-500 text-xs mt-1">{{ form.empresa_numero.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_colonia.label }}</label>
+                        {{ form.empresa_colonia }}
+                        {% if form.empresa_colonia.errors %}<p class="text-red-500 text-xs mt-1">{{ form.empresa_colonia.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_cp.label }}</label>
+                        {{ form.empresa_cp }}
+                        {% if form.empresa_cp.errors %}<p class="text-red-500 text-xs mt-1">{{ form.empresa_cp.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.empresa_referencias.label }}</label>
+                        {{ form.empresa_referencias }}
+                        {% if form.empresa_referencias.errors %}<p class="text-red-500 text-xs mt-1">{{ form.empresa_referencias.errors.0 }}</p>{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Información Laboral -->
+            <div>
+                <h2 class="text-sm font-semibold text-gray-800 mb-3 border-b pb-1.5">Información Laboral</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.puesto.label }}</label>
+                        {{ form.puesto }}
+                        {% if form.puesto.errors %}<p class="text-red-500 text-xs mt-1">{{ form.puesto.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.salario.label }}</label>
+                        {{ form.salario }}
+                        {% if form.salario.errors %}<p class="text-red-500 text-xs mt-1">{{ form.salario.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.fecha_ingreso.label }}</label>
+                        {{ form.fecha_ingreso }}
+                        {% if form.fecha_ingreso.errors %}<p class="text-red-500 text-xs mt-1">{{ form.fecha_ingreso.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.fecha_salida.label }}</label>
+                        {{ form.fecha_salida }}
+                        {% if form.fecha_salida.errors %}<p class="text-red-500 text-xs mt-1">{{ form.fecha_salida.errors.0 }}</p>{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Asesoría Gratuita -->
+            <div>
+                <h2 class="text-sm font-semibold text-gray-800 mb-3 border-b pb-1.5">🎓 Asesoría Gratuita</h2>
+                <p class="text-xs text-gray-500 mb-3">Si el cliente no puede contratar en este momento, ofrécele una asesoría gratuita semanal y agenda una fecha.</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="flex items-center gap-2 pt-2">
+                        {{ form.asesoria_gratuita_ofrecida }}
+                        <label for="{{ form.asesoria_gratuita_ofrecida.id_for_label }}" class="text-sm font-medium text-gray-700 cursor-pointer">
+                            Se ofreció asesoría gratuita
+                        </label>
+                    </div>
+                    <div class="flex items-center gap-2 pt-2">
+                        {{ form.asesoria_gratuita_agendada }}
+                        <label for="{{ form.asesoria_gratuita_agendada.id_for_label }}" class="text-sm font-medium text-gray-700 cursor-pointer">
+                            Cliente agendó fecha
+                        </label>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.fecha_asesoria_gratuita.label }}</label>
+                        {{ form.fecha_asesoria_gratuita }}
+                        {% if form.fecha_asesoria_gratuita.errors %}<p class="text-red-500 text-xs mt-1">{{ form.fecha_asesoria_gratuita.errors.0 }}</p>{% endif %}
+                    </div>
+                </div>
+                <p class="text-xs text-gray-400 mt-2">💡 Las asesorías agendadas aparecerán en el dashboard del asesor y en el calendario.</p>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+                <a href="{% url 'cliente_list' %}"
+                   class="px-4 py-1.5 text-sm text-gray-700 bg-gray-100 rounded hover:bg-gray-200 transition-colors">
+                    Cancelar
+                </a>
+                <button type="submit"
+                        class="px-5 py-1.5 text-sm bg-gray-800 text-white rounded hover:bg-gray-700 transition-colors font-semibold">
+                    {% if object %}Guardar Cambios{% else %}Crear Cliente{% endif %}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

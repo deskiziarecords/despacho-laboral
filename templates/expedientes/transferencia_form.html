@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+{% block title %}Solicitar Transferencia - {{ expediente.numero }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-4">
+    <!-- Header -->
+    <div class="card">
+        <div class="card-header flex items-center justify-between" style="background: #2a3340; color: white; border-bottom: none;">
+            <div class="flex items-center space-x-2">
+                <h1 class="text-sm font-bold">🔄 Solicitar Transferencia de Caso</h1>
+                <span class="badge {{ ESTADO_COLORS|get_item:expediente.estado }}">
+                    {{ expediente.get_estado_display }}
+                </span>
+            </div>
+            <a href="{% url 'expediente_detail' expediente.pk %}" class="btn btn-sm"
+               style="background:#47505e; color:white; border-color:#36404f;">
+                ← Volver al expediente
+            </a>
+        </div>
+
+        <!-- Info del caso -->
+        <div class="card-body" style="background: #f5f6f7; border-bottom: 1px solid #e8eaed;">
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <span class="text-[10px] text-gray-500 uppercase tracking-wider">Expediente</span>
+                    <p class="text-sm font-bold mt-0.5">{{ expediente.numero }}</p>
+                </div>
+                <div>
+                    <span class="text-[10px] text-gray-500 uppercase tracking-wider">Cliente</span>
+                    <p class="text-sm font-medium mt-0.5">{{ expediente.cliente.nombre }}</p>
+                </div>
+                <div>
+                    <span class="text-[10px] text-gray-500 uppercase tracking-wider">Asesor actual</span>
+                    <p class="text-sm font-medium mt-0.5">{{ expediente.asesor.get_full_name|default:expediente.asesor.username }}</p>
+                </div>
+                <div>
+                    <span class="text-[10px] text-gray-500 uppercase tracking-wider">Empresa</span>
+                    <p class="text-sm font-medium mt-0.5">{{ expediente.cliente.empresa|default:'—' }}</p>
+                </div>
+            </div>
+            {% if expediente.fecha_audiencia %}
+            <div class="mt-2 pt-2 border-t border-gray-200">
+                <span class="text-[10px] text-gray-500 uppercase tracking-wider">📅 Próxima audiencia</span>
+                <p class="text-sm font-semibold text-amber-700 mt-0.5">{{ expediente.fecha_audiencia|date:"l d/m/Y H:i" }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Formulario -->
+        <form method="post" action="{% url 'enviar_solicitud_transferencia' expediente.pk %}" class="card-body space-y-4">
+            {% csrf_token %}
+
+            <!-- Motivo -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-800 mb-1.5">
+                    ¿Por qué necesitas transferir este caso? <span class="text-red-500">*</span>
+                </label>
+                <textarea name="motivo" required rows="4"
+                          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Ej: Tengo una audiencia programada el mismo día y no podré asistir. El caso requiere atención urgente."></textarea>
+                <p class="text-xs text-gray-500 mt-1">Explica el motivo para que administración pueda priorizar la reasignación.</p>
+            </div>
+
+            <!-- Asesor destino (opcional) -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-800 mb-1.5">
+                    ¿Sugieres algún asesor en específico? <span class="text-gray-400 font-normal">(opcional)</span>
+                </label>
+                <select name="asesor_destino"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <option value="">— Que administración asigne al disponible —</option>
+                    {% for asesor in asesores_disponibles %}
+                    <option value="{{ asesor.pk }}">
+                        {{ asesor.get_full_name|default:asesor.username }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Puedes sugerir a un compañero que esté familiarizado con el caso o dejarlo abierto.</p>
+            </div>
+
+            <!-- Acciones -->
+            <div class="flex items-center justify-between pt-3 border-t border-gray-200">
+                <div class="flex items-center text-xs text-gray-500">
+                    <span class="w-2 h-2 bg-yellow-400 rounded-full inline-block mr-1.5"></span>
+                    Una vez enviada, administración revisará y asignará
+                </div>
+                <div class="flex space-x-2">
+                    <a href="{% url 'expediente_detail' expediente.pk %}"
+                       class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                        Cancelar
+                    </a>
+                    <button type="submit"
+                            class="px-6 py-2 text-sm font-medium text-white rounded-lg transition-all"
+                            style="background: #8b3a3a; hover:background: #6b2a2a;"
+                            onmouseover="this.style.background='#6b2a2a'"
+                            onmouseout="this.style.background='#8b3a3a'">
+                        🔄 Enviar Solicitud
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Información adicional -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <h3 class="text-sm font-semibold text-gray-800 mb-2">ℹ️ ¿Qué pasa después?</h3>
+        <ol class="text-sm text-gray-600 space-y-1.5 list-decimal list-inside">
+            <li>Tu solicitud queda <strong>pendiente</strong> y el área administrativa la recibe</li>
+            <li>Administración revisa el motivo y reasigna el caso al asesor más adecuado</li>
+            <li>Recibirás una notificación cuando se apruebe o si necesitan más información</li>
+            <li>Si el asesor sugerido no está disponible, asignarán a quien esté libre</li>
+            <li>Puedes cancelar la solicitud mientras esté pendiente desde el detalle del expediente</li>
+        </ol>
+    </div>
+</div>
+{% endblock %}

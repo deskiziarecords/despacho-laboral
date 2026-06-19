@@ -1,0 +1,551 @@
+{% extends 'base.html' %}
+{% load static custom_filters %}
+{% block title %}{{ expediente.numero }} - Despacho Laboral{% endblock %}
+
+{% block content %}
+<div class="space-y-3">
+    <!-- Header -->
+    <div class="card">
+        <div class="card-header flex items-center justify-between" style="background: #2a3340; color: white; border-bottom: none;">
+            <div class="flex items-center space-x-2">
+                <h1 class="text-sm font-bold">{{ expediente.numero }}</h1>
+                <span class="badge {{ ESTADO_COLORS|get_item:expediente.estado }}">
+                    {{ expediente.get_estado_display }}
+                </span>
+                {% if expediente.prioridad == 'alta' %}
+                <span class="badge" style="background:#8b3a3a; color:white;">🔴 Alta prioridad</span>
+                {% elif expediente.prioridad == 'baja' %}
+                <span class="badge" style="background:#6b7280; color:white;">Baja prioridad</span>
+                {% endif %}
+            </div>
+            <div class="flex items-center space-x-1.5">
+                <a href="{% url 'calculo_laboral' expediente.pk %}" class="btn" style="background:#47505e; color:white; border-color:#36404f;"><img src="{% static 'svg/calculator.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Cálculos</a>
+                <a href="{% url 'whatsapp_enviar' expediente.pk %}" class="btn btn-success"><img src="{% static 'svg/whatsapp.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> WhatsApp</a>
+                <a href="{% url 'solicitud_conciliacion' expediente.pk %}" class="btn" style="background:#47505e; color:white; border-color:#36404f;"><img src="{% static 'svg/file-document-multiple-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Solicitud</a>
+                <a href="{% url 'enviar_conciliacion_automation' expediente.pk %}" class="btn" style="background:#1a6b3c; color:white; border-color:#145530;">🌐 Enviar a Conciliación</a>
+                {% if user.profile.rol == 'admin' or user.profile.rol == 'superadmin' or user.profile.puede_generar_documentos %}
+                <a href="{% url 'machotes_listar' expediente.pk %}" class="btn btn-success"><img src="{% static 'svg/file-document-multiple-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Documentos</a>
+                <a href="{% url 'demanda_editor' expediente.pk %}" class="btn" style="background:#47505e; color:white; border-color:#36404f;"><img src="{% static 'svg/file-edit-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Demanda</a>
+                {% endif %}
+                <a href="{% url 'solicitar_transferencia' expediente.pk %}" class="btn" style="background:#8b3a3a; color:white; border-color:#6b2a2a;"><img src="{% static 'svg/file-edit-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Transferir</a>
+                <a href="{% url 'expediente_update' expediente.pk %}" class="btn btn-primary"><img src="{% static 'svg/application-edit-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Editar</a>
+                <a href="{% url 'generar_pdf' expediente.pk %}" class="btn btn-danger"><img src="{% static 'svg/printer-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> PDF</a>
+            </div>
+        </div>
+
+        <div class="card-body grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div>
+                <span class="text-[10px] text-gray-500 uppercase tracking-wider">Asesor</span>
+                <p class="text-sm font-medium mt-0.5">{{ expediente.asesor.get_full_name|default:expediente.asesor.username }}</p>
+            </div>
+            <div>
+                <span class="text-[10px] text-gray-500 uppercase tracking-wider">Cliente</span>
+                <p class="text-sm font-medium mt-0.5">{{ expediente.cliente.nombre }}</p>
+                <p class="text-xs text-gray-500">{{ expediente.cliente.curp }}</p>
+            </div>
+            <div>
+                <span class="text-[10px] text-gray-500 uppercase tracking-wider">Empresa</span>
+                <p class="text-sm font-medium mt-0.5">{{ expediente.cliente.empresa|default:'—' }}</p>
+            </div>
+            <div>
+                <span class="text-[10px] text-gray-500 uppercase tracking-wider">Creado</span>
+                <p class="text-sm font-medium mt-0.5">{{ expediente.created_at|date:"d/m/Y H:i" }}</p>
+            </div>
+        </div>
+
+        <!-- Formulario de Conciliación -->
+        <div class="card-body" style="padding-top: 0;">
+            <span class="text-[10px] text-gray-500 uppercase tracking-wider flex items-center gap-1"><img src="{% static 'svg/file-document-multiple-outline.svg' %}" class="w-3 h-3 icon-darkblue"> Formulario de Conciliación</span>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-1" style="background: #f5f6f7; padding: 8px;">
+                <div>
+                    <span class="text-[10px] text-gray-500">Tipo de Despido</span>
+                    <p class="text-xs font-medium">{{ expediente.get_tipo_despido_display|default:'—' }}</p>
+                </div>
+                <div>
+                    <span class="text-[10px] text-gray-500">Folio de Trámite</span>
+                    <p class="text-xs font-medium">{{ expediente.folio|default:'—' }}</p>
+                </div>
+                <div>
+                    <span class="text-[10px] text-gray-500">Fecha de Trámite</span>
+                    <p class="text-xs font-medium">{{ expediente.fecha_tramite|date:"d/m/Y"|default:'—' }}</p>
+                </div>
+                <div>
+                    <span class="text-[10px] text-gray-500">Resultado Audiencia</span>
+                    <p class="text-xs font-medium">{{ expediente.get_resultado_audiencia_display|default:'—' }}</p>
+                </div>
+            </div>
+            {% if expediente.prestaciones_reclamadas %}
+            <div class="mt-2" style="background: #f5f6f7; padding: 8px;">
+                <span class="text-[10px] text-gray-500">Prestaciones Reclamadas</span>
+                <p class="text-xs text-gray-700 mt-0.5">{{ expediente.prestaciones_reclamadas|linebreaksbr }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Montos -->
+        <div class="card-body grid grid-cols-1 md:grid-cols-2 gap-3" style="padding-top: 0;">
+            <div style="padding: 10px; border: 1px solid #47505e; background: #f0f2f5;">
+                <span class="text-xs font-medium text-gray-700">Monto Reclamado</span>
+                <p class="text-lg font-bold text-gray-800">{% if expediente.monto_reclamado %}${{ expediente.monto_reclamado|floatformat:0 }}{% else %}—{% endif %}</p>
+            </div>
+            <div style="padding: 10px; border: 1px solid #3d6b4d; background: #f3f7f4;">
+                <span class="text-xs font-medium text-gray-700">Monto Convenio</span>
+                <p class="text-lg font-bold text-gray-800">{% if expediente.monto_convenio %}${{ expediente.monto_convenio|floatformat:0 }}{% else %}—{% endif %}</p>
+            </div>
+        </div>
+
+        <!-- Fechas -->
+        <div class="card-body grid grid-cols-1 md:grid-cols-3 gap-3" style="padding-top: 0;">
+            <div>
+                <span class="text-[10px] text-gray-500 flex items-center gap-1"><img src="{% static 'svg/calendar-month-outline.svg' %}" class="w-3 h-3 icon-darkblue"> Audiencia</span>
+                <p class="text-sm font-medium">{% if expediente.fecha_audiencia %}{{ expediente.fecha_audiencia|date:"d/m/Y H:i" }}{% else %}No programada{% endif %}</p>
+            </div>
+            <div>
+                <span class="text-[10px] text-gray-500">⏰ Próxima Acción</span>
+                <p class="text-sm font-medium">{% if expediente.proxima_accion %}{{ expediente.proxima_accion|date:"d/m/Y" }}{% else %}Sin fecha{% endif %}</p>
+            </div>
+            <div>
+                <span class="text-[10px] text-gray-500 flex items-center gap-1"><img src="{% static 'svg/calendar-month-outline.svg' %}" class="w-3 h-3 icon-darkblue"> Actualizado</span>
+                <p class="text-sm font-medium">{{ expediente.updated_at|date:"d/m/Y H:i" }}</p>
+            </div>
+        </div>
+
+        <!-- Notas internas -->
+        {% if expediente.notas %}
+        <div class="card-body" style="padding-top: 0;">
+            <span class="text-[10px] text-gray-500 uppercase tracking-wider">Notas Internas</span>
+            <p class="text-sm text-gray-700 mt-1" style="background: #f5f6f7; padding: 8px;">{{ expediente.notas|linebreaks }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Cambio de Estado Rápido -->
+    {% if transiciones_posibles %}
+    <div class="bg-white rounded shadow-sm border border-gray-200 p-4">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"><img src="{% static 'svg/file-edit-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Cambiar Estado</h2>
+        <div class="flex flex-wrap gap-2">
+            {% for key, label in transiciones_posibles %}
+            <form method="post" action="{% url 'cambiar_estado' expediente.pk %}" class="inline"
+                  hx-post="{% url 'cambiar_estado' expediente.pk %}" hx-swap="none" hx-on::after-request="location.reload()">
+                {% csrf_token %}
+                <input type="hidden" name="estado" value="{{ key }}">
+                <button type="submit"
+                        class="px-4 py-2 rounded-lg text-sm font-medium border transition-colors
+                        {% if key == 'cerrado' %}bg-red-50 text-red-700 border-red-200 hover:bg-red-100
+                        {% elif key == 'convenio' %}bg-green-50 text-green-700 border-green-200 hover:bg-green-100
+                        {% elif key == 'audiencia' %}bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-100
+                        {% elif key == 'solicitud' %}bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100
+                        {% elif key == 'citatorio' %}bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100
+                        {% elif key == 'demanda' %}bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100
+                        {% elif key == 'no_notificado' %}bg-red-50 text-red-700 border-red-200 hover:bg-red-100
+                        {% elif key == 'reprogramacion' %}bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100
+                        {% elif key == 'sin_conciliacion' %}bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100
+                        {% else %}bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100{% endif %}">
+                    {{ label }}
+                </button>
+            </form>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Resultado de Audiencia -->
+    {% if expediente.estado == 'audiencia' %}
+    <div class="bg-white rounded shadow-sm border border-gray-200 p-4">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"><img src="{% static 'svg/calendar-month-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Registrar Resultado de Audiencia</h2>
+        <form method="post" action="{% url 'resultado_audiencia' expediente.pk %}" class="space-y-4">
+            {% csrf_token %}
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <button type="submit" name="resultado" value="no_notificado"
+                        class="p-4 rounded-lg border-2 border-red-200 bg-red-50 hover:bg-red-100 hover:border-red-400 transition-all text-center">
+                    <span class="block text-2xl mb-1">❌</span>
+                    <span class="font-medium text-red-700">No notificado</span>
+                    <span class="block text-xs text-red-500">Generar nueva audiencia</span>
+                </button>
+                <button type="submit" name="resultado" value="convenio"
+                        class="p-4 rounded-lg border-2 border-green-200 bg-green-50 hover:bg-green-100 hover:border-green-400 transition-all text-center">
+                    <span class="block text-2xl mb-1">🤝</span>
+                    <span class="font-medium text-green-700">Convenio</span>
+                    <span class="block text-xs text-green-500">Registrar monto y cerrar</span>
+                </button>
+                <button type="submit" name="resultado" value="sin_conciliacion"
+                        class="p-4 rounded-lg border-2 border-gray-200 bg-gray-50 hover:bg-gray-100 hover:border-gray-400 transition-all text-center">
+                    <span class="block text-2xl mb-1">🚫</span>
+                    <span class="font-medium text-gray-700">Sin conciliación</span>
+                    <span class="block text-xs text-gray-500">Preparar demanda</span>
+                </button>
+                <button type="submit" name="resultado" value="reprogramada"
+                        class="p-4 rounded-lg border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-400 transition-all text-center">
+                    <span class="block text-2xl mb-1">🔄</span>
+                    <span class="font-medium text-amber-700">Reprogramar</span>
+                    <span class="block text-xs text-amber-500">Nueva fecha</span>
+                </button>
+            </div>
+            <!-- Si es convenio, preguntar monto -->
+            <div id="monto_convenio_field" class="hidden">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Monto de Convenio</label>
+                <input type="number" name="monto_convenio" step="0.01"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                       placeholder="Monto acordado en convenio">
+            </div>
+        </form>
+    </div>
+
+    <script>
+    document.querySelectorAll('[name="resultado"]').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            if (this.value === 'convenio') {
+                e.preventDefault();
+                document.getElementById('monto_convenio_field').classList.remove('hidden');
+                if (!confirm('¿Registrar convenio? Ingresa el monto abajo y envía.')) {
+                    document.getElementById('monto_convenio_field').classList.add('hidden');
+                } else {
+                    this.form.submit();
+                }
+            }
+        });
+    });
+    </script>
+    {% endif %}
+
+    <!-- Documentos -->
+    <div class="card">
+        <div class="card-header flex items-center gap-1.5"><img src="{% static 'svg/attachment.svg' %}" class="w-4 h-4 icon-darkblue"> Documentos</div>
+        <div class="card-body">
+            <form method="post" action="{% url 'subir_documento' expediente.pk %}" enctype="multipart/form-data" class="mb-3" style="background: #f5f6f7; padding: 10px;">
+                {% csrf_token %}
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
+                    <div>{{ documento_form.archivo }}</div>
+                    <div>{{ documento_form.descripcion }}</div>
+                    <div>{{ documento_form.tipo }}</div>
+                    <button type="submit" class="btn btn-primary">Subir Documento</button>
+                </div>
+            </form>
+
+            {% if documentos %}
+            <div class="space-y-1">
+                {% for doc in documentos %}
+                <div class="flex items-center justify-between px-3 py-2" style="background: #f5f6f7; border: 1px solid #e8eaed;">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-base">
+                            {% if doc.tipo == 'ine' %}🪪{% elif doc.tipo == 'contrato' %}📄{% elif doc.tipo == 'evidencia' %}🔍{% elif doc.tipo == 'screenshot' %}📸{% elif doc.tipo == 'citatorio' %}📬{% else %}📎{% endif %}
+                        </span>
+                        <div>
+                            <p class="text-sm font-medium">
+                                <a href="{{ doc.archivo.url }}" target="_blank" class="text-blue-700 hover:text-blue-900">{{ doc.descripcion }}</a>
+                            </p>
+                            <p class="text-xs text-gray-500">
+                                <span class="badge" style="background:#dbeafe; color:#1e40af;">{{ doc.get_tipo_display }}</span>
+                                {{ doc.subido_por.get_full_name|default:doc.subido_por.username }} · {{ doc.created_at|date:"d/m/Y H:i" }}
+                            </p>
+                        </div>
+                    </div>
+                    <a href="{% url 'eliminar_documento' doc.pk %}"
+                       class="text-xs text-red-600 hover:text-red-800"
+                       onclick="return confirm('¿Eliminar este documento?')">Eliminar</a>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-400 text-sm text-center py-3">No hay documentos subidos.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Historial de Transferencias -->
+    {% if transferencias %}
+    <div class="card" style="border-color: #8b3a3a;">
+        <div class="card-header" style="background: #8b3a3a; color: white; border-bottom: none;"><img src="{% static 'svg/file-edit-outline.svg' %}" class="w-4 h-4" style="filter: brightness(0) invert(1); display: inline; vertical-align: middle; margin-right: 4px;"> Historial de Transferencias</div>
+        <div class="card-body space-y-2">
+            {% for t in transferencias %}
+            <div class="px-3 py-2" style="background: #f5f6f7; border: 1px solid #e8eaed;">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        {% if t.estado == 'aprobada' %}
+                        <span class="text-sm">✅</span>
+                        {% elif t.estado == 'rechazada' %}
+                        <span class="text-sm">❌</span>
+                        {% elif t.estado == 'cancelada' %}
+                        <span class="text-sm">🔙</span>
+                        {% else %}
+                        <span class="text-sm">⏳</span>
+                        {% endif %}
+                        <div>
+                            <p class="text-xs font-medium text-gray-800">
+                                {% if t.estado == 'aprobada' %}
+                                Transferido a <strong>{{ t.asesor_asignado.get_full_name|default:t.asesor_asignado.username }}</strong>
+                                {% elif t.estado == 'rechazada' %}
+                                Rechazada
+                                {% elif t.estado == 'cancelada' %}
+                                Cancelada por {{ t.solicitante.get_full_name|default:t.solicitante.username }}
+                                {% else %}
+                                Pendiente
+                                {% endif %}
+                            </p>
+                            <p class="text-[10px] text-gray-500">
+                                Solicitado por <strong>{{ t.solicitante.get_full_name|default:t.solicitante.username }}</strong>
+                                · {{ t.created_at|date:"d/m/Y H:i" }}
+                                {% if t.fecha_resolucion %}
+                                · Resuelto {{ t.fecha_resolucion|date:"d/m/Y H:i" }}
+                                {% endif %}
+                            </p>
+                            {% if t.motivo %}
+                            <p class="text-[10px] text-gray-600 mt-0.5" style="background: #fff; padding: 2px 5px; display: inline-block; border-radius: 2px;">
+                                “{{ t.motivo|truncatechars:80 }}”
+                            </p>
+                            {% endif %}
+                            {% if t.comentario_admin %}
+                            <p class="text-[10px] text-blue-600 mt-0.5">💬 {{ t.comentario_admin }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if t.estado == 'pendiente' and t.solicitante == request.user %}
+                    <form method="post" action="{% url 'cancelar_transferencia' t.pk %}">
+                        {% csrf_token %}
+                        <button type="submit" class="text-xs text-red-600 hover:text-red-800"
+                                onclick="return confirm('¿Cancelar esta solicitud de transferencia?')">
+                            Cancelar
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Notas / Timeline -->
+    <div class="card">
+        <div class="card-header flex items-center gap-1.5"><img src="{% static 'svg/message-text-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Notas y Seguimiento</div>
+        <div class="card-body">
+            <form method="post" action="{% url 'agregar_nota' expediente.pk %}" class="mb-3" style="background: #f5f6f7; padding: 10px;">
+                {% csrf_token %}
+                <div class="flex space-x-2">
+                    <div class="flex-1">{{ nota_form.contenido }}</div>
+                    <button type="submit" class="btn btn-primary self-start">Agregar Nota</button>
+                </div>
+            </form>
+
+            {% if notas_lista %}
+            <div class="space-y-2">
+                {% for nota in notas_lista %}
+                <div class="flex space-x-2">
+                    <div class="flex-shrink-0">
+                        <div class="w-7 h-7 flex items-center justify-center" style="background: #36404f; color: white; font-size: 11px; font-weight: 700;">
+                            {{ nota.usuario.get_full_name|default:nota.usuario.username|first|upper }}
+                        </div>
+                    </div>
+                    <div class="flex-1" style="background: #f5f6f7; padding: 8px 10px;">
+                        <div class="flex items-center justify-between mb-0.5">
+                            <span class="font-medium text-gray-800 text-xs">{{ nota.usuario.get_full_name|default:nota.usuario.username }}</span>
+                            <span class="text-[10px] text-gray-500">{{ nota.created_at|date:"d/m/Y H:i" }}</span>
+                        </div>
+                        <p class="text-xs text-gray-700">{{ nota.contenido|linebreaksbr }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-400 text-sm text-center py-3">No hay notas registradas.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- WhatsApp -->
+    <div class="card" id="whatsapp-section">
+        <div class="card-header flex items-center justify-between">
+            <span class="flex items-center gap-1.5"><img src="{% static 'svg/whatsapp.svg' %}" class="w-4 h-4 icon-darkblue"> WhatsApp</span>
+            <div class="flex items-center gap-2">
+                <!-- Toggle notificaciones automáticas (HTMX) -->
+                <form method="post"
+                      hx-post="{% url 'toggle_whatsapp_auto' expediente.pk %}"
+                      hx-swap="none"
+                      hx-on::after-request="
+                        const details = document.querySelector('[data-whatsapp-indicator]');
+                        if (details) {
+                            const active = JSON.parse(event.detail.xhr.responseText).notificar_whatsapp_auto;
+                            details.innerHTML = active
+                                ? '<span class=\"badge bg-green-100 text-green-700 text-[10px]\">🤖 Activo</span>'
+                                : '<span class=\"badge bg-gray-100 text-gray-500 text-[10px]\">🤖 Inactivo</span>';
+                        }
+                      ">
+                    {% csrf_token %}
+                    <label class="flex items-center gap-1.5 cursor-pointer select-none text-xs text-gray-600 hover:text-gray-800 transition-colors">
+                        <span data-whatsapp-indicator>
+                            {% if expediente.notificar_whatsapp_auto %}
+                            <span class="badge bg-green-100 text-green-700 text-[10px]">🤖 Activo</span>
+                            {% else %}
+                            <span class="badge bg-gray-100 text-gray-500 text-[10px]">🤖 Inactivo</span>
+                            {% endif %}
+                        </span>
+                    <input type="checkbox"
+                           name="notificar_whatsapp_auto"
+                           {% if expediente.notificar_whatsapp_auto %}checked{% endif %}
+                           class="sr-only peer"
+                           onchange="this.closest('form').requestSubmit();">
+                        <div class="relative w-8 h-4 bg-gray-300 peer-checked:bg-green-500 rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+                    </label>
+                </form>
+                <a href="{% url 'whatsapp_enviar' expediente.pk %}" class="btn btn-success btn-sm">
+                    <i class="fas fa-plus mr-1"></i> Enviar
+                </a>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if expediente.cliente.whatsapp or expediente.cliente.telefono %}
+            <div class="flex items-center space-x-3 mb-3" style="background: #f3f7f4; padding: 8px 10px;">
+                <span class="text-green-700">📞</span>
+                <div class="flex-1">
+                    <p class="text-xs font-medium text-gray-800">Contacto WhatsApp disponible</p>
+                    <p class="text-[10px] text-gray-600">
+                        WhatsApp: {{ expediente.cliente.whatsapp|default:'—' }} · Tel: {{ expediente.cliente.telefono }}
+                    </p>
+                </div>
+                <a href="https://wa.me/{{ expediente.cliente.whatsapp|default:expediente.cliente.telefono|cut:'+'|cut:' '|cut:'-' }}"
+                   target="_blank" class="btn btn-sm btn-success">Abrir WhatsApp</a>
+            </div>
+            {% endif %}
+
+            <!-- Mensajes automaticos pendientes -->
+            {% with auto_mensajes=expediente.whatsapp_mensajes.all %}
+            {% if auto_mensajes|length > 0 %}
+            <div class="mb-3" style="background: #fefce8; border: 1px solid #facc15; border-radius: 6px;">
+                <div class="px-3 py-2 border-b border-yellow-200 flex items-center justify-between">
+                    <span class="text-xs font-medium text-yellow-800">Mensajes Automaticos</span>
+                </div>
+                {% for msg in auto_mensajes|slice:":5" %}
+                <div class="px-3 py-2 {% if not forloop.last %}border-b border-yellow-100{% endif %}">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1 min-w-0">
+                            <p class="text-xs text-gray-800">{{ msg.mensaje|truncatechars:120 }}</p>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="text-[10px] text-gray-500">{{ msg.created_at|date:"d/m/Y H:i" }}</span>
+                                <span class="text-[10px] font-medium
+                                    {% if msg.estado == 'pendiente' %}text-yellow-600
+                                    {% elif msg.estado == 'enviado' %}text-green-600
+                                    {% else %}text-red-600{% endif %}">
+                                    {{ msg.get_estado_display }}
+                                </span>
+                                {% if msg.estado == 'pendiente' %}
+                                <span class="text-[10px] text-gray-400">(pendiente de envio por comando)</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if msg.link_generado %}
+                        <a href="{{ msg.link_generado }}" target="_blank" class="ml-2 flex-shrink-0 btn btn-sm btn-success text-[10px] py-1 px-2">Abrir</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            <div id="whatsapp-historial"
+                 hx-get="{% url 'whatsapp_historial' expediente.pk %}"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
+                <div class="text-center py-3">
+                    <div style="width: 20px; height: 20px; border: 2px solid #d4d6d9; border-top-color: #47505e; border-radius: 50%; animation: spin 0.6s linear infinite; margin: 0 auto;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timeline Visual de Actividad -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-800 flex items-center gap-1.5"><img src="{% static 'svg/text-box-edit-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Línea de Tiempo</h2>
+            <span class="text-xs text-gray-400">{{ movimientos|length }} evento{{ movimientos|length|pluralize:"s" }}</span>
+        </div>
+        <div class="p-6">
+            {% if movimientos %}
+            <div class="relative">
+                <!-- Línea vertical (de fondo) -->
+                <div class="absolute left-[7.5rem] top-0 bottom-0 w-0.5 bg-gray-200 hidden md:block"></div>
+
+                <div class="space-y-0">
+                    {% for mov in movimientos %}
+                    <div class="relative group">
+                        <div class="flex items-start gap-4 pb-6 last:pb-0">
+                            <!-- Fecha (columna izquierda desktop) -->
+                            <div class="hidden md:block w-[6rem] flex-shrink-0 text-right pt-1">
+                                <div class="text-xs font-semibold text-gray-700">
+                                    {{ mov.created_at|date:"d M" }}
+                                </div>
+                                <div class="text-[10px] text-gray-400">
+                                    {{ mov.created_at|date:"H:i" }}
+                                </div>
+                            </div>
+
+                            <!-- Indicador circular (centro) -->
+                            <div class="hidden md:flex flex-shrink-0 relative z-10">
+                                <div class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] shadow-sm ring-4 ring-white
+                                    {% if mov.accion == 'creacion' %}bg-green-500 text-white
+                                    {% elif mov.accion == 'cambio_estado' %}bg-yellow-500 text-white
+                                    {% elif mov.accion == 'actualizacion' %}bg-blue-500 text-white
+                                    {% elif mov.accion == 'subida_documento' %}bg-indigo-500 text-white
+                                    {% elif mov.accion == 'nota_agregada' %}bg-purple-500 text-white
+                                    {% elif mov.accion == 'resultado_audiencia' %}bg-amber-500 text-white
+                                    {% else %}bg-gray-400 text-white{% endif %}">
+                                    {% if mov.accion == 'creacion' %}✓{% elif mov.accion == 'cambio_estado' %}⟳{% elif mov.accion == 'actualizacion' %}✎{% elif mov.accion == 'subida_documento' %}📎{% elif mov.accion == 'nota_agregada' %}💬{% elif mov.accion == 'resultado_audiencia' %}★{% else %}●{% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Indicador móvil -->
+                            <div class="md:hidden flex-shrink-0 pt-1">
+                                <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm shadow-sm
+                                    {% if mov.accion == 'creacion' %}bg-green-100
+                                    {% elif mov.accion == 'cambio_estado' %}bg-yellow-100
+                                    {% elif mov.accion == 'actualizacion' %}bg-blue-100
+                                    {% elif mov.accion == 'subida_documento' %}bg-indigo-100
+                                    {% elif mov.accion == 'nota_agregada' %}bg-purple-100
+                                    {% elif mov.accion == 'resultado_audiencia' %}bg-amber-100
+                                    {% else %}bg-gray-100{% endif %}">
+                                    {% if mov.accion == 'creacion' %}✨{% elif mov.accion == 'cambio_estado' %}🔄{% elif mov.accion == 'actualizacion' %}📝{% elif mov.accion == 'subida_documento' %}📎{% elif mov.accion == 'nota_agregada' %}💬{% elif mov.accion == 'resultado_audiencia' %}🎯{% else %}●{% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Tarjeta de contenido -->
+                            <div class="flex-1 min-w-0">
+                                <div class="bg-gray-50 rounded-lg p-3 border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all duration-150">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="text-xs font-semibold md:hidden text-gray-500">
+                                            {{ mov.created_at|date:"d/m/Y H:i" }}
+                                        </span>
+                                        <span class="px-2 py-0.5 text-[11px] font-semibold rounded-full
+                                            {% if mov.accion == 'creacion' %}bg-green-100 text-green-700
+                                            {% elif mov.accion == 'cambio_estado' %}bg-yellow-100 text-yellow-700
+                                            {% elif mov.accion == 'actualizacion' %}bg-blue-100 text-blue-700
+                                            {% elif mov.accion == 'subida_documento' %}bg-indigo-100 text-indigo-700
+                                            {% elif mov.accion == 'nota_agregada' %}bg-purple-100 text-purple-700
+                                            {% elif mov.accion == 'resultado_audiencia' %}bg-amber-100 text-amber-700
+                                            {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                            {{ mov.get_accion_display }}
+                                        </span>
+                                        <span class="text-xs text-gray-500">
+                                            por <strong class="text-gray-700 font-medium">{{ mov.usuario.get_full_name|default:mov.usuario.username }}</strong>
+                                        </span>
+                                    </div>
+                                    {% if mov.detalle %}
+                                    <p class="mt-1.5 text-sm text-gray-600 leading-relaxed pl-0.5">{{ mov.detalle }}</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% else %}
+            <div class="text-center py-8">
+                <div class="text-4xl mb-3">📭</div>
+                <p class="text-gray-500">Aún no hay actividad registrada en este expediente.</p>
+                <p class="text-sm text-gray-400 mt-1">Los movimientos aparecerán aquí automáticamente.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

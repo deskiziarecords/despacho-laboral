@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% load static custom_filters %}
+{% block title %}Expedientes - Despacho Laboral{% endblock %}
+
+{% block content %}
+<div class="space-y-3">
+    <div class="flex items-center justify-between">
+        <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <img src="{% static 'svg/file-document-multiple-outline.svg' %}" class="w-5 h-5 icon-darkblue">
+            Expedientes
+        </h1>
+        <a href="{% url 'expediente_create' %}" class="btn btn-primary">
+            + Nuevo Expediente
+        </a>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card">
+        <form method="get" class="grid grid-cols-2 md:grid-cols-6 gap-2 p-3">
+            <div>
+                <input type="text" name="q" placeholder="Buscar (n° exp, cliente, CURP, empresa, folio)..."
+                       value="{{ filtros.q|default:'' }}" class="w-full text-xs">
+            </div>
+            <div>
+                <select name="estado" class="w-full">
+                    <option value="">Todos los estados</option>
+                    {% for key, label in estados %}
+                    <option value="{{ key }}" {% if filtros.estado == key %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <select name="asesor" class="w-full">
+                    <option value="">Todos los asesores</option>
+                    {% for asesor in asesores_filtro %}
+                    <option value="{{ asesor.pk }}" {% if filtros.asesor == asesor.pk|stringformat:'s' %}selected{% endif %}>
+                        {{ asesor.get_full_name|default:asesor.username }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <select name="prioridad" class="w-full">
+                    <option value="">Todas las prioridades</option>
+                    <option value="alta" {% if filtros.prioridad == 'alta' %}selected{% endif %}>Alta</option>
+                    <option value="media" {% if filtros.prioridad == 'media' %}selected{% endif %}>Media</option>
+                    <option value="baja" {% if filtros.prioridad == 'baja' %}selected{% endif %}>Baja</option>
+                </select>
+            </div>
+            <div>
+                <input type="date" name="fecha_desde" value="{{ filtros.fecha_desde|default:'' }}" class="w-full">
+            </div>
+            <div class="flex space-x-1">
+                <button type="submit" class="btn btn-primary">Filtrar</button>
+                <a href="{% url 'expediente_list' %}" class="btn">Limpiar</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tabla -->
+    <div class="card overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr>
+                        <th>N° Exp</th>
+                        <th>Cliente</th>
+                        <th>Empresa</th>
+                        <th>Asesor</th>
+                        <th>Estado</th>
+                        <th>Prioridad</th>
+                        <th>Monto</th>
+                        <th>Audiencia</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for exp in object_list %}
+                    <tr>
+                        <td class="font-medium text-gray-800">{{ exp.numero }}</td>
+                        <td>{{ exp.cliente.nombre }}</td>
+                        <td class="text-gray-600">{{ exp.cliente.empresa|default:'—' }}</td>
+                        <td class="text-gray-600">{{ exp.asesor.get_full_name|default:exp.asesor.username }}</td>
+                        <td>
+                            <span class="badge {{ ESTADO_COLORS|get_item:exp.estado }}">
+                                {{ exp.get_estado_display }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if exp.prioridad == 'alta' %}
+                            <span class="text-xs text-red-700">🔴 Alta</span>
+                            {% elif exp.prioridad == 'baja' %}
+                            <span class="text-xs text-gray-400">⚪ Baja</span>
+                            {% else %}
+                            <span class="text-xs text-yellow-700">🟡 Media</span>
+                            {% endif %}
+                        </td>
+                        <td>{% if exp.monto_reclamado %}${{ exp.monto_reclamado|floatformat:0 }}{% else %}—{% endif %}</td>
+                        <td class="text-gray-500">{% if exp.fecha_audiencia %}{{ exp.fecha_audiencia|date:"d/m/Y" }}{% else %}—{% endif %}</td>
+                        <td>
+                            <a href="{% url 'expediente_detail' exp.pk %}" class="btn btn-sm">Ver</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center text-gray-400 py-8">
+                            No hay expedientes registrados.
+                            <a href="{% url 'expediente_create' %}" class="block text-sm text-blue-700 hover:text-blue-900 mt-1">Crear primer expediente →</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Paginación -->
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="flex items-center justify-between" style="padding: 6px 10px; background: #fff; border: 1px solid #d4d6d9; border-radius: 3px;">
+        <div class="text-xs text-gray-500">
+            Mostrando {{ page_obj.start_index }} - {{ page_obj.end_index }} de {{ page_obj.paginator.count }}
+        </div>
+        <div class="flex space-x-1">
+            {% if page_obj.has_previous %}
+            <a href="?page=1{% for k, v in filtros.items %}&{{ k }}={{ v }}{% endfor %}" class="btn btn-sm">Primera</a>
+            <a href="?page={{ page_obj.previous_page_number }}{% for k, v in filtros.items %}&{{ k }}={{ v }}{% endfor %}" class="btn btn-sm">Anterior</a>
+            {% endif %}
+            <span class="btn btn-sm btn-primary">Pág. {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% for k, v in filtros.items %}&{{ k }}={{ v }}{% endfor %}" class="btn btn-sm">Siguiente</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}{% for k, v in filtros.items %}&{{ k }}={{ v }}{% endfor %}" class="btn btn-sm">Última</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

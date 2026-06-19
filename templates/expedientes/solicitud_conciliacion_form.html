@@ -1,0 +1,358 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+{% block title %}Solicitud de Conciliación - {{ expediente.numero }}{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto py-6">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-base font-bold text-gray-800">📋 Solicitud de Conciliación</h1>
+            <p class="text-gray-500 text-xs">Expediente: <strong>{{ expediente.numero }}</strong> — {{ expediente.cliente.nombre }}</p>
+        </div>
+        <div class="flex gap-2">
+            <a href="{% url 'expediente_detail' expediente.pk %}"
+               class="px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50 transition-colors text-xs">
+                ← Volver
+            </a>
+            <button onclick="window.print()"
+                    class="bg-gray-800 text-white px-3 py-1.5 rounded hover:bg-gray-700 transition-colors text-xs">
+                🖨️ Imprimir
+            </button>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="mb-4">
+        {% for message in messages %}
+        <div class="px-4 py-3 rounded-lg text-sm {% if message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" class="bg-white shadow-xl border border-gray-300 p-6 md:p-10 print:shadow-none print:border-0">
+        {% csrf_token %}
+
+        <!-- Header -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start mb-8">
+            <div>
+                <h1 class="font-bold text-xl leading-tight">BAJA CALIFORNIA</h1>
+                <p class="text-sm font-semibold">CONCILIACIÓN</p>
+                <p class="text-xs text-gray-500">Centro de Conciliación Laboral</p>
+            </div>
+            <div class="text-center">
+                <p class="text-xs uppercase font-semibold mb-1">Unidad Sede</p>
+                {{ form.unidad_sede }}
+            </div>
+            <div>
+                <p class="text-xs uppercase font-semibold mb-2">Formato para iniciar la solicitud</p>
+                <label class="input-label">Fecha</label>
+                {{ form.fecha_solicitud }}
+            </div>
+        </div>
+
+        <!-- Error summary -->
+        {% if form.errors %}
+        <div class="mb-4 p-3 bg-red-50 border border-red-200 rounded">
+            <p class="text-sm font-medium text-red-700">Por favor corrige los siguientes errores:</p>
+            <ul class="mt-2 text-sm text-red-600 list-disc list-inside">
+                {% for field, errors in form.errors.items %}
+                {% for error in errors %}
+                <li>{{ field|capfirst }}: {{ error }}</li>
+                {% endfor %}
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <!-- INFORMACION DEL TRABAJADOR -->
+        <div class="mb-6">
+            <div class="form-section-title">Información del trabajador</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border border-t-0 border-gray-300 p-4">
+                <div>
+                    <label class="input-label">Nombre completo</label>
+                    <input type="text" class="input" value="{{ expediente.cliente.nombre }}" readonly
+                           onclick="alert('Edita el nombre del cliente desde el formulario de cliente.')">
+                </div>
+                <div>
+                    <label class="input-label">CURP</label>
+                    <input type="text" class="input" value="{{ expediente.cliente.curp }}" readonly>
+                </div>
+                <div>
+                    <label class="input-label">Edad</label>
+                    {{ form.edad }}
+                </div>
+                <div>
+                    <label class="input-label">Teléfono</label>
+                    <input type="tel" class="input" value="{{ expediente.cliente.telefono }}" readonly>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="input-label">Correo electrónico</label>
+                    <input type="email" class="input" value="{{ expediente.cliente.email }}" readonly>
+                </div>
+            </div>
+        </div>
+
+        <!-- DIRECCION -->
+        <div class="mb-6">
+            <div class="form-section-title">Dirección particular</div>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 border border-t-0 border-gray-300 p-4">
+                <div class="md:col-span-2">
+                    <label class="input-label">Calle</label>
+                    <input type="text" class="input" value="{{ expediente.cliente.direccion_calle }}" readonly
+                           onclick="alert('Edita la dirección desde el formulario del cliente.')">
+                </div>
+                <div>
+                    <label class="input-label">Número</label>
+                    <input type="text" class="input" value="{{ expediente.cliente.direccion_numero }}" readonly>
+                </div>
+                <div>
+                    <label class="input-label">Código Postal</label>
+                    <input type="text" class="input" value="{{ expediente.cliente.direccion_cp }}" readonly>
+                </div>
+                <div class="md:col-span-4">
+                    <label class="input-label">Colonia / Ejido / Poblado</label>
+                    <input type="text" class="input" value="{{ expediente.cliente.direccion_colonia }}" readonly>
+                </div>
+            </div>
+        </div>
+
+        <!-- EMPLEO -->
+        <div class="mb-6">
+            <div class="form-section-title">Datos sobre su empleo</div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border border-t-0 border-gray-300 p-4">
+                <div>
+                    <label class="input-label">Fecha del conflicto</label>
+                    {{ form.fecha_conflicto }}
+                </div>
+                <div>
+                    <label class="input-label">Fecha de ingreso</label>
+                    <input type="date" class="input" value="{{ expediente.cliente.fecha_ingreso|date:'Y-m-d' }}" readonly>
+                </div>
+                <div>
+                    <label class="input-label">Último día laborado</label>
+                    <input type="date" class="input" value="{{ expediente.cliente.fecha_salida|date:'Y-m-d' }}" readonly>
+                </div>
+                <div>
+                    <label class="input-label">Puesto desempeñado</label>
+                    <input type="text" class="input" value="{{ expediente.cliente.puesto }}" readonly>
+                </div>
+                <div>
+                    <label class="input-label">Horas semanales trabajadas</label>
+                    {{ form.horas_semanales }}
+                </div>
+                <div>
+                    <label class="input-label">Monto del salario</label>
+                    <input type="text" class="input" value="{% if expediente.cliente.salario %}${{ expediente.cliente.salario|floatformat:2 }}{% endif %}" readonly>
+                </div>
+                <div class="md:col-span-3">
+                    <label class="input-label mb-3">Periodo de pago</label>
+                    <div class="flex flex-wrap gap-6">
+                        {% for radio in form.periodo_pago %}
+                        <label class="flex items-center gap-2 text-sm">
+                            {{ radio.tag }}
+                            {{ radio.choice_label }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- EMPRESA -->
+        <div class="mb-6">
+            <div class="form-section-title">Datos de la empresa y/o patrón</div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border border-t-0 border-gray-300 p-4">
+                <div class="md:col-span-3">
+                    <label class="input-label">Nombre</label>
+                    <input type="text" class="input" value="{{ expediente.cliente.empresa }}" readonly>
+                </div>
+                <div class="md:col-span-3">
+                    <label class="input-label">Actividad económica del patrón</label>
+                    <input type="text" class="input" value="{{ expediente.cliente.empresa_actividad }}" readonly>
+                </div>
+                <div>
+                    <label class="input-label">RFC</label>
+                    <input type="text" class="input" value="{{ expediente.cliente.rfc }}" readonly>
+                </div>
+                <div>
+                    <label class="input-label">Teléfono</label>
+                    <input type="text" class="input" value="{{ expediente.cliente.empresa_telefono }}" readonly>
+                </div>
+                <div>
+                    <label class="input-label">Razón social / Nombre comercial</label>
+                    <input type="text" class="input" value="{{ expediente.cliente.empresa_razon_social }}" readonly>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="input-label">Calle</label>
+                    <input type="text" class="input" value="{{ expediente.cliente.empresa_calle }}" readonly>
+                </div>
+                <div>
+                    <label class="input-label">Número</label>
+                    <input type="text" class="input" value="{{ expediente.cliente.empresa_numero }}" readonly>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="input-label">Colonia / Ejido / Poblado</label>
+                    <input type="text" class="input" value="{{ expediente.cliente.empresa_colonia }}" readonly>
+                </div>
+                <div>
+                    <label class="input-label">Código Postal</label>
+                    <input type="text" class="input" value="{{ expediente.cliente.empresa_cp }}" readonly>
+                </div>
+                <div class="md:col-span-3">
+                    <label class="input-label">Referencias cercanas al domicilio</label>
+                    <textarea class="input min-h-[60px]" readonly>{{ expediente.cliente.empresa_referencias }}</textarea>
+                </div>
+            </div>
+            <p class="text-xs text-gray-400 mt-1">* Los datos del cliente y empresa se editan desde el formulario del cliente.</p>
+        </div>
+
+        <!-- OBJETO -->
+        <div class="mb-6">
+            <div class="form-section-title">Objeto de la solicitud</div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 border border-t-0 border-gray-300 p-4">
+                <div>
+                    <label class="flex items-center gap-3 mb-3 text-sm">{{ form.objeto_despido }} Despido</label>
+                    <label class="flex items-center gap-3 mb-3 text-sm">{{ form.objeto_antiguedad }} Derecho de antigüedad</label>
+                    <label class="flex items-center gap-3 mb-3 text-sm">{{ form.objeto_prestaciones }} Pago de prestaciones</label>
+                    <label class="flex items-center gap-3 mb-3 text-sm">{{ form.objeto_ascenso }} Derecho de ascenso</label>
+                </div>
+                <div>
+                    <label class="flex items-center gap-3 mb-3 text-sm">{{ form.objeto_terminacion_voluntaria }} Terminación voluntaria</label>
+                    <label class="flex items-center gap-3 mb-3 text-sm">{{ form.objeto_rescision }} Rescisión de la relación laboral</label>
+                    <label class="flex items-center gap-3 mb-3 text-sm">{{ form.objeto_preferencia }} Derecho de preferencia</label>
+                    <label class="flex items-center gap-3 mb-3 text-sm">{{ form.objeto_acoso }} Acoso laboral</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- CITATORIO -->
+        <div class="mb-6">
+            <div class="form-section-title">Quién entregará el citatorio</div>
+            <div class="border border-t-0 border-gray-300 p-4 flex flex-wrap gap-8">
+                {% for radio in form.citatorio_entrega %}
+                <label class="flex items-center gap-2 text-sm">
+                    {{ radio.tag }}
+                    {{ radio.choice_label }}
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- DISCAPACIDAD -->
+        <div class="mb-6">
+            <div class="form-section-title">¿Usted cuenta con alguna discapacidad?</div>
+            <div class="border border-t-0 border-gray-300 p-4 grid grid-cols-2 md:grid-cols-3 gap-4">
+                <label class="flex items-center gap-2 text-sm">{{ form.discapacidad_motriz }} Motriz</label>
+                <label class="flex items-center gap-2 text-sm">{{ form.discapacidad_visual }} Visual</label>
+                <label class="flex items-center gap-2 text-sm">{{ form.discapacidad_auditiva }} Auditiva</label>
+                <label class="flex items-center gap-2 text-sm">{{ form.discapacidad_psicosocial }} Psicosocial-Cognitiva</label>
+                <label class="flex items-center gap-2 text-sm">{{ form.discapacidad_habla }} Habla o lenguaje</label>
+            </div>
+        </div>
+
+        <!-- TRADUCTOR -->
+        <div class="mb-8">
+            <div class="form-section-title">¿Requiere asistencia de algún traductor?</div>
+            <div class="border border-t-0 border-gray-300 p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label class="flex items-center gap-2 text-sm">{{ form.requiere_traductor }} Señas</label>
+                <div>
+                    <label class="input-label">Lengua de origen</label>
+                    {{ form.traductor_lengua }}
+                </div>
+            </div>
+        </div>
+
+        <!-- FIRMA -->
+        <div class="mb-6">
+            <div class="form-section-title">Firma del solicitante</div>
+            <div class="border border-t-0 border-gray-300 p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="input-label">Nombre del firmante</label>
+                    {{ form.firma_nombre }}
+                </div>
+                <div>
+                    <label class="input-label">Fecha de firma</label>
+                    {{ form.firma_fecha }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Botones de acción -->
+        <div class="flex justify-between mt-6 pt-4 border-t border-gray-200 print-hidden">
+            <a href="{% url 'expediente_detail' expediente.pk %}"
+               class="px-4 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 transition-colors">
+                Cancelar
+            </a>
+            <div class="flex gap-2">
+                <button type="button" onclick="guardarBorrador()"
+                        class="px-3 py-1.5 text-sm border border-gray-400 rounded hover:bg-gray-100 transition-colors">
+                    💾 Guardar borrador
+                </button>
+                <button type="submit"
+                        class="px-4 py-1.5 text-sm bg-gray-800 text-white rounded hover:bg-gray-700 transition-colors font-medium">
+                    ✅ Guardar solicitud
+                </button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-10 text-[10px] text-gray-500 leading-relaxed border-t pt-4">
+            Los datos personales que recabamos de usted, serán tratados de manera
+            confidencial única y exclusivamente para las atribuciones de este Centro.
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    body { font-family: 'Inter', sans-serif; }
+    @media print {
+        body { background: white; }
+        .print-hidden { display: none !important; }
+        .bg-white { box-shadow: none !important; border: 1px solid #ddd !important; }
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function guardarBorrador() {
+    const form = document.querySelector('form');
+    const data = new FormData(form);
+    const obj = {};
+    for (let [key, value] of data.entries()) {
+        if (!key.startsWith('csrf')) {
+            obj[key] = value;
+        }
+    }
+    localStorage.setItem('solicitudConciliacion_' + '{{ expediente.pk }}', JSON.stringify(obj));
+    alert('✅ Borrador guardado localmente.');
+}
+
+// Auto-cargar borrador si existe
+(function() {
+    const saved = localStorage.getItem('solicitudConciliacion_' + '{{ expediente.pk }}');
+    if (saved) {
+        const data = JSON.parse(saved);
+        let count = 0;
+        Object.keys(data).forEach(key => {
+            const field = document.querySelector(`[name="${key}"]`);
+            if (field) {
+                if (field.type === 'checkbox' || field.type === 'radio') {
+                    field.checked = (data[key] === 'on' || data[key] === 'true');
+                } else {
+                    field.value = data[key];
+                }
+                count++;
+            }
+        });
+        if (count > 0) {
+            console.log('Borrador cargado: ' + count + ' campos.');
+        }
+    }
+})();
+</script>
+{% endblock %}

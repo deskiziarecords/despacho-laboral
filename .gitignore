@@ -1,0 +1,46 @@
+# Django
+*.pyc
+__pycache__/
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Base de datos
+*.sqlite3
+*.db
+
+# Entorno virtual
+.venv/
+venv/
+env/
+
+# Media (archivos subidos por usuarios)
+media/
+!media/.gitkeep
+
+# Archivos de entorno
+.env
+
+# Logs
+*.log
+server.log
+nul
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Archivos de test / capturas
+test_*.py
+*_test.png
+diagnostico_*.png
+test_v2_*.png

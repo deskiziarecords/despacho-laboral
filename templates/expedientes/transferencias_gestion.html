@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Gestión de Transferencias - Despacho Laboral{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <!-- Header -->
+    <div class="card">
+        <div class="card-header flex items-center justify-between" style="background: #2a3340; color: white; border-bottom: none;">
+            <div class="flex items-center space-x-2">
+                <h1 class="text-sm font-bold flex items-center gap-1.5"><img src="{% static 'svg/file-edit-outline.svg' %}" class="w-4 h-4" style="filter: brightness(0) invert(1);"> Gestión de Transferencias</h1>
+                <span class="badge" style="background:#eab308; color:#854d0e;">
+                    {{ pendientes|length }} pendiente{{ pendientes|length|pluralize:"s" }}
+                </span>
+            </div>
+            <a href="{% url 'dashboard_admin' %}" class="btn btn-sm" style="background:#47505e; color:white; border-color:#36404f;">
+                ← Dashboard
+            </a>
+        </div>
+    </div>
+
+    {% if pendientes %}
+    <!-- Solicitudes Pendientes -->
+    <div class="space-y-3">
+        <h2 class="text-lg font-semibold text-gray-800 flex items-center">
+            <img src="{% static 'svg/bell-check-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Solicitudes Pendientes
+            <span class="ml-2 text-sm font-normal text-gray-500">({{ pendientes|length }})</span>
+        </h2>
+
+        {% for solicitud in pendientes %}
+        <div class="bg-white rounded-lg shadow-sm border border-amber-200 overflow-hidden">
+            <!-- Info del caso -->
+            <div class="p-4 border-b border-amber-100" style="background: #fffbeb;">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-2 mb-1">
+                            <span class="px-2 py-0.5 text-xs font-semibold bg-yellow-100 text-yellow-800 rounded-full">⏳ Pendiente</span>
+                            <span class="text-sm font-bold">{{ solicitud.expediente.numero }}</span>
+                            <span class="text-sm text-gray-600">— {{ solicitud.expediente.cliente.nombre }}</span>
+                        </div>
+                        <p class="text-xs text-gray-500">
+                            Solicitado por <strong>{{ solicitud.solicitante.get_full_name|default:solicitud.solicitante.username }}</strong>
+                            · {{ solicitud.created_at|date:"d/m/Y H:i" }}
+                        </p>
+                    </div>
+                    {% if solicitud.expediente.fecha_audiencia %}
+                    <div class="text-right flex-shrink-0 ml-4">
+                        <span class="text-[10px] text-gray-500">📅 Audiencia</span>
+                        <p class="text-xs font-semibold text-amber-700">{{ solicitud.expediente.fecha_audiencia|date:"d/m/Y H:i" }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Motivo -->
+            <div class="px-4 py-3 border-b border-gray-100">
+                <span class="text-xs font-semibold text-gray-700">Motivo:</span>
+                <p class="text-sm text-gray-600 mt-0.5">{{ solicitud.motivo|linebreaksbr }}</p>
+            </div>
+
+            <!-- Asesor destino sugerido -->
+            {% if solicitud.asesor_destino %}
+            <div class="px-4 py-2" style="background: #f0f4ff; border-bottom: 1px solid #e0e7ff;">
+                <span class="text-xs text-blue-700">🤝 Asesor sugerido: <strong>{{ solicitud.asesor_destino.get_full_name|default:solicitud.asesor_destino.username }}</strong></span>
+            </div>
+            {% endif %}
+
+            <!-- Formulario de resolución -->
+            <div class="p-4" style="background: #f9fafb;">
+                <form method="post" action="{% url 'aprobar_transferencia' solicitud.pk %}" class="space-y-3">
+                    {% csrf_token %}
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <!-- Asignar nuevo asesor -->
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">
+                                Asignar a: <span class="text-red-500">*</span>
+                            </label>
+                            <select name="nuevo_asesor" required
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                                <option value="">— Seleccionar asesor —</option>
+                                {% for asesor in asesores_disponibles %}
+                                <option value="{{ asesor.pk }}" {% if solicitud.asesor_destino == asesor %}selected{% endif %}>
+                                    {{ asesor.get_full_name|default:asesor.username }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Comentario -->
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">
+                                Comentario <span class="text-gray-400">(opcional)</span>
+                            </label>
+                            <input type="text" name="comentario" placeholder="Nota para el asesor..."
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <!-- Acciones -->
+                    <div class="flex items-center justify-end space-x-2 pt-2">
+                        <!-- Rechazar -->
+                        <button type="submit" formaction="{% url 'rechazar_transferencia' solicitud.pk %}"
+                                class="px-4 py-2 text-sm font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                                onclick="return confirm('¿Rechazar esta solicitud de transferencia?')">
+                            ❌ Rechazar
+                        </button>
+                        <!-- Aprobar -->
+                        <button type="submit"
+                                class="px-4 py-2 text-sm font-medium text-white rounded-lg transition-all"
+                                style="background: #166534;"
+                                onmouseover="this.style.background='#14532d'"
+                                onmouseout="this.style.background='#166534'"
+                                onclick="return confirm('¿Confirmar la transferencia y reasignación?')">
+                            ✅ Aprobar y Reasignar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <!-- Sin pendientes -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+        <div class="text-5xl mb-3">✅</div>
+        <h3 class="text-lg font-semibold text-gray-700">No hay transferencias pendientes</h3>
+        <p class="text-sm text-gray-500 mt-1">Todas las solicitudes han sido procesadas.</p>
+    </div>
+    {% endif %}
+
+    {% if historial %}
+    <!-- Historial -->
+    <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5"><img src="{% static 'svg/text-box-edit-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Historial reciente</h3>
+            <span class="text-xs text-gray-400">{{ historial|length }} registro{{ historial|length|pluralize:"s" }}</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="bg-gray-50 text-left text-xs text-gray-500 uppercase">
+                        <th class="px-4 py-2">Expediente</th>
+                        <th class="px-4 py-2">Cliente</th>
+                        <th class="px-4 py-2">Solicitante</th>
+                        <th class="px-4 py-2">Estado</th>
+                        <th class="px-4 py-2">Asignado a</th>
+                        <th class="px-4 py-2">Resuelto por</th>
+                        <th class="px-4 py-2">Fecha</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for h in historial %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 font-medium">{{ h.expediente.numero }}</td>
+                        <td class="px-4 py-2">{{ h.expediente.cliente.nombre }}</td>
+                        <td class="px-4 py-2 text-gray-600">{{ h.solicitante.get_full_name|default:h.solicitante.username }}</td>
+                        <td class="px-4 py-2">
+                            {% if h.estado == 'aprobada' %}
+                            <span class="px-2 py-0.5 text-xs font-semibold bg-green-100 text-green-800 rounded-full">✅ Aprobada</span>
+                            {% elif h.estado == 'rechazada' %}
+                            <span class="px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-800 rounded-full">❌ Rechazada</span>
+                            {% elif h.estado == 'cancelada' %}
+                            <span class="px-2 py-0.5 text-xs font-semibold bg-gray-100 text-gray-800 rounded-full">🔙 Cancelada</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-2">{{ h.asesor_asignado.get_full_name|default:h.asesor_asignado.username|default:'—' }}</td>
+                        <td class="px-4 py-2 text-gray-600">{{ h.resuelto_por.get_full_name|default:h.resuelto_por.username|default:'—' }}</td>
+                        <td class="px-4 py-2 text-gray-500 text-xs">{{ h.fecha_resolucion|date:"d/m/Y H:i"|default:'—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

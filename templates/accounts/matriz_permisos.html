@@ -1,0 +1,254 @@
+{% extends 'base.html' %}
+{% block title %}Matriz de Permisos - Despacho Laboral{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-lg font-bold text-gray-800">🔐 Matriz de Permisos</h1>
+            <p class="text-xs text-gray-500">Auditoría completa de usuarios y permisos del sistema — {{ fecha_generacion|date:"d/m/Y H:i" }}</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <a href="{% url 'exportar_matriz_permisos_excel' %}" class="btn btn-success btn-sm">
+                📥 Exportar Excel
+            </a>
+            <a href="{% url 'superadmin_dashboard' %}" class="btn">
+                ← Volver a Superadmin
+            </a>
+        </div>
+    </div>
+
+    <!-- Resumen -->
+    <div class="grid grid-cols-4 md:grid-cols-9 gap-2">
+        <div class="card p-3 text-center">
+            <div class="text-lg font-bold text-gray-800">{{ resumen.total }}</div>
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Total</div>
+        </div>
+        <div class="card p-3 text-center" style="border-left: 3px solid #374151;">
+            <div class="text-lg font-bold text-gray-800">{{ resumen.superadmins }}</div>
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Superadmin</div>
+        </div>
+        <div class="card p-3 text-center" style="border-left: 3px solid #3b82f6;">
+            <div class="text-lg font-bold text-gray-800">{{ resumen.admins }}</div>
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Admin</div>
+        </div>
+        <div class="card p-3 text-center" style="border-left: 3px solid #6b7280;">
+            <div class="text-lg font-bold text-gray-800">{{ resumen.asesores }}</div>
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Asesores</div>
+        </div>
+        <div class="card p-3 text-center" style="border-left: 3px solid #22c55e;">
+            <div class="text-lg font-bold text-green-700">{{ resumen.activos }}</div>
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Activos</div>
+        </div>
+        <div class="card p-3 text-center" style="border-left: 3px solid #ef4444;">
+            <div class="text-lg font-bold text-red-700">{{ resumen.inactivos }}</div>
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Inactivos</div>
+        </div>
+        <div class="card p-3 text-center" style="border-left: 3px solid #a855f7;">
+            <div class="text-lg font-bold text-purple-700">{{ resumen.staff }}</div>
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Staff</div>
+        </div>
+        <div class="card p-3 text-center" style="border-left: 3px solid #f59e0b;">
+            <div class="text-lg font-bold text-amber-700">{{ resumen.con_docs }}</div>
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Docs</div>
+        </div>
+        <div class="card p-3 text-center" style="border-left: 3px solid #64748b;">
+            <div class="text-lg font-bold text-slate-700">{{ resumen.sin_perfil }}</div>
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Sin Perfil</div>
+        </div>
+    </div>
+
+    <!-- Matriz de Permisos -->
+    <div class="card overflow-hidden">
+        <div class="card-header flex items-center justify-between">
+            <span>👥 Permisos por Usuario</span>
+            <span class="text-xs font-normal text-gray-500 normal-case">{{ permisos|length }} usuarios</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full" style="font-size: 11px !important;">
+                <thead>
+                    <tr>
+                        <th style="min-width: 130px;">Usuario</th>
+                        <th style="min-width: 80px;">Nombre</th>
+                        <th style="min-width: 150px;">Email</th>
+                        <th style="min-width: 80px;">Rol</th>
+                        <th class="text-center" style="min-width: 50px;" title="¿Puede generar documentos legales?">📄 Docs</th>
+                        <th class="text-center" style="min-width: 50px;" title="¿Es staff de Django?">🔑 Staff</th>
+                        <th class="text-center" style="min-width: 50px;" title="¿Es superusuario de Django?">👑 Super</th>
+                        <th class="text-center" style="min-width: 50px;" title="¿Está activo?">✅ Activo</th>
+                        <th class="text-center" style="min-width: 40px;">📋 Casos</th>
+                        <th class="text-center" style="min-width: 40px;">🔄 Mov.</th>
+                        <th style="min-width: 110px;">Último Acceso</th>
+                        <th style="min-width: 100px;">Creado</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for p in permisos %}
+                    <tr class="{% if not p.is_active %}bg-red-50{% elif p.rol == 'superadmin' %}bg-gray-50{% elif p.rol == 'admin' %}bg-blue-50/40{% endif %}">
+                        <td class="font-mono font-medium">{{ p.username }}</td>
+                        <td>{{ p.nombre_completo }}</td>
+                        <td class="text-gray-600">{{ p.email }}</td>
+                        <td>
+                            <span class="badge
+                                {% if p.rol == 'superadmin' %}bg-gray-700 text-white
+                                {% elif p.rol == 'admin' %}bg-blue-100 text-blue-700
+                                {% elif p.rol == 'asesor' %}bg-gray-100 text-gray-700
+                                {% else %}bg-red-100 text-red-700{% endif %}">
+                                {{ p.rol_display }}
+                            </span>
+                        </td>
+                        <td class="text-center text-base">
+                            {% if p.puede_generar_documentos %}
+                            <span title="Puede generar documentos" class="text-amber-600">📄</span>
+                            {% else %}
+                            <span class="text-gray-300">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if p.is_staff %}
+                            <span class="text-blue-600 font-bold">✓</span>
+                            {% else %}
+                            <span class="text-gray-300">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if p.is_superuser %}
+                            <span class="text-amber-600 font-bold">✓</span>
+                            {% else %}
+                            <span class="text-gray-300">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if p.is_active %}
+                            <span class="inline-block w-2.5 h-2.5 bg-green-500" style="border-radius: 50%;"></span>
+                            {% else %}
+                            <span class="inline-block w-2.5 h-2.5 bg-red-500" style="border-radius: 50%;"></span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center font-bold">{{ p.total_expedientes }}</td>
+                        <td class="text-center">{{ p.total_movimientos }}</td>
+                        <td class="text-[10px] text-gray-500">
+                            {% if p.ultimo_acceso %}
+                            {{ p.ultimo_acceso|date:"d/m/Y H:i" }}
+                            {% else %}
+                            <span class="text-gray-400 italic">Nunca</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-[10px] text-gray-500">{{ p.fecha_union|date:"d/m/Y" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="12" class="text-center text-gray-400 py-8">No hay usuarios registrados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Leyenda -->
+    <div class="card p-3">
+        <div class="flex flex-wrap items-center gap-4 text-[11px] text-gray-600">
+            <span class="font-bold text-gray-700 uppercase tracking-wider">Leyenda:</span>
+            <span class="flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 bg-green-500" style="border-radius: 50%;"></span> Activo</span>
+            <span class="flex items-center gap-1"><span class="inline-block w-2.5 h-2.5 bg-red-500" style="border-radius: 50%;"></span> Inactivo</span>
+            <span>📄 Docs = Permiso para generar documentos legales</span>
+            <span>🔑 Staff = Puede acceder al admin de Django</span>
+            <span>👑 Super = Superusuario de Django</span>
+            <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 bg-gray-50 border border-gray-300"></span> Superadmin</span>
+            <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 bg-blue-50/40 border border-gray-300"></span> Admin</span>
+        </div>
+    </div>
+
+    <!-- Auditoría de Cambios de Permisos -->
+    <div class="card">
+        <div class="card-header flex items-center justify-between">
+            <span>📋 Auditoría de Cambios de Permisos</span>
+            <span class="text-xs font-normal text-gray-500 normal-case">
+                {{ total_cambios_30d }} cambios en últimos 30 días
+                · <a href="{% url 'admin:accounts_permisoauditlog_changelist' %}" target="_blank" class="text-blue-600 hover:text-blue-800 underline">Ver todos</a>
+            </span>
+        </div>
+
+        <!-- Mini resumen -->
+        {% if cambios_por_tipo %}
+        <div class="px-3 py-2 border-b border-gray-200 flex flex-wrap gap-3 text-[11px] text-gray-600">
+            {% for tipo, count in cambios_por_tipo.items %}
+            <span>{{ tipo }}: <strong class="text-gray-800">{{ count }}</strong></span>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="overflow-x-auto">
+            <table class="w-full" style="font-size: 11px !important;">
+                <thead>
+                    <tr>
+                        <th style="min-width: 100px;">Fecha</th>
+                        <th style="min-width: 120px;">Usuario</th>
+                        <th style="min-width: 120px;">Modificado por</th>
+                        <th style="min-width: 110px;">Acción</th>
+                        <th>Detalle del Cambio</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for log in audit_log %}
+                    <tr>
+                        <td class="text-gray-500 whitespace-nowrap">{{ log.created_at|date:"d/m/Y H:i" }}</td>
+                        <td>
+                            <span class="font-medium">{{ log.usuario_modificado.get_full_name|default:log.usuario_modificado.username }}</span>
+                            {% if log.usuario_modificado.profile %}
+                            <span class="badge
+                                {% if log.usuario_modificado.profile.rol == 'superadmin' %}bg-gray-700 text-white
+                                {% elif log.usuario_modificado.profile.rol == 'admin' %}bg-blue-100 text-blue-700
+                                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                {{ log.usuario_modificado.profile.get_rol_display }}
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-gray-600">
+                            {% if log.modificado_por %}
+                            {{ log.modificado_por.get_full_name|default:log.modificado_por.username }}
+                            {% else %}
+                            <span class="text-gray-400 italic">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge
+                                {% if log.accion == 'cambio_rol' %}bg-purple-100 text-purple-700
+                                {% elif log.accion == 'cambio_docs' %}bg-amber-100 text-amber-700
+                                {% elif log.accion == 'cambio_staff' %}bg-blue-100 text-blue-700
+                                {% elif log.accion == 'cambio_activo' %}bg-green-100 text-green-700
+                                {% elif log.accion == 'mixto' %}bg-red-100 text-red-700
+                                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                {{ log.get_accion_display }}
+                            </span>
+                        </td>
+                        <td class="text-gray-600">{{ log.detalle }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-gray-400 py-6">
+                            No hay cambios de permisos registrados. Los cambios se registran automáticamente cuando un administrador modifica un perfil de usuario.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Acciones rápidas -->
+    <div class="flex items-center gap-2">
+        <a href="{% url 'admin:auth_user_changelist' %}" target="_blank" class="btn btn-primary btn-sm">
+            👤 Gestionar Usuarios (Admin)
+        </a>
+        <a href="{% url 'admin:accounts_permisoauditlog_changelist' %}" target="_blank" class="btn btn-sm">
+            📋 Ver Auditoría Completa
+        </a>
+        <a href="{% url 'superadmin_dashboard' %}" class="btn btn-sm">
+            🔧 Volver al Panel Superadmin
+        </a>
+    </div>
+</div>
+{% endblock %}

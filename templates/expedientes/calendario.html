@@ -1,0 +1,346 @@
+{% extends 'base.html' %}
+{% load static custom_filters %}
+{% block title %}Calendario de Audiencias - Despacho Laboral{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-base font-bold text-gray-800 flex items-center gap-2">
+            <img src="{% static 'svg/calendar-month-outline.svg' %}" class="w-5 h-5 icon-darkblue">
+            Calendario de Audiencias
+        </h1>
+    </div>
+
+    <!-- Filtros -->
+    <div class="bg-white rounded shadow-sm border border-gray-200 p-3">
+        <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div>
+                <select name="asesor" class="w-full px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 text-xs"
+                        onchange="this.form.submit()">
+                    <option value="">Todos los asesores</option>
+                    {% for asesor in asesores_filtro %}
+                    <option value="{{ asesor.pk }}" {% if filtros.asesor == asesor.pk|stringformat:'s' %}selected{% endif %}>
+                        {{ asesor.get_full_name|default:asesor.username }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <select name="estado" class="w-full px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 text-xs"
+                        onchange="this.form.submit()">
+                    <option value="">Todos los estados</option>
+                    {% for key, label in estados_filtro %}
+                    <option value="{{ key }}" {% if filtros.estado == key %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <select name="vista" class="w-full px-2 py-1.5 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-gray-500 text-xs"
+                        onchange="this.form.submit()">
+                    <option value="lista" {% if vista_actual == 'lista' %}selected{% endif %}>Vista Lista</option>
+                    <option value="mes" {% if vista_actual == 'mes' %}selected{% endif %}>Vista Mensual</option>
+                    <option value="semana" {% if vista_actual == 'semana' %}selected{% endif %}>Vista Semanal</option>
+                    <option value="planner" {% if vista_actual == 'planner' %}selected{% endif %}>📋 Planner</option>
+                </select>
+            </div>
+            <div>
+                {% if filtros.asesor or filtros.estado %}
+                <a href="{% url 'calendario_audiencias' %}" class="w-full block text-center bg-gray-200 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-300 transition-colors text-xs">
+                    Limpiar filtros
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    {% if vista_actual == 'lista' %}
+    <!-- Vista Lista -->
+    <div class="bg-white rounded shadow-sm border border-gray-200">
+        <div class="px-4 py-2.5 border-b border-gray-200">
+            <h2 class="text-sm font-semibold text-gray-800">Audiencias Programadas</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expediente</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Empresa</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asesor</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha y Hora</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for exp in eventos %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-2 text-xs font-medium">{{ exp.numero }}</td>
+                        <td class="px-4 py-2 text-xs">{{ exp.cliente.nombre }}</td>
+                        <td class="px-4 py-2 text-xs text-gray-600">{{ exp.cliente.empresa|default:'—' }}</td>
+                        <td class="px-4 py-2 text-xs">{{ exp.asesor.get_full_name|default:exp.asesor.username }}</td>
+                        <td class="px-4 py-2">
+                            <span class="px-1.5 py-0.5 text-[10px] rounded-full {{ ESTADO_COLORS|get_item:exp.estado }}">
+                                {{ exp.get_estado_display }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-2 text-xs font-medium">{{ exp.fecha_audiencia|date:"d/m/Y H:i" }}</td>
+                        <td class="px-4 py-2">
+                            <a href="{% url 'expediente_detail' exp.pk %}" class="text-gray-600 hover:text-gray-800 text-xs">Ver</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="px-4 py-8 text-center text-xs text-gray-500">No hay audiencias programadas.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% elif vista_actual == 'planner' %}
+    <!-- Vista Planner Semanal (3-column) -->
+    <div class="planner">
+        <div class="planner-header">
+            <div class="planner-month">{{ mes_actual|upper }} {{ anio_actual }}</div>
+            <div class="planner-week">SEMANA {{ semana_actual }}</div>
+            <div class="planner-nav">
+                <a href="?vista=planner&semana={{ semana_anterior }}{% if filtros.asesor %}&asesor={{ filtros.asesor }}{% endif %}{% if filtros.estado %}&estado={{ filtros.estado }}{% endif %}"
+                   class="planner-nav-btn">‹ Anterior</a>
+                <a href="?vista=planner{% if filtros.asesor %}&asesor={{ filtros.asesor }}{% endif %}{% if filtros.estado %}&estado={{ filtros.estado }}{% endif %}" class="planner-nav-btn">Hoy</a>
+                <a href="?vista=planner&semana={{ semana_siguiente }}{% if filtros.asesor %}&asesor={{ filtros.asesor }}{% endif %}{% if filtros.estado %}&estado={{ filtros.estado }}{% endif %}"
+                   class="planner-nav-btn">Siguiente ›</a>
+            </div>
+        </div>
+        <div class="planner-days">
+            {% for dia in dias_semana %}
+            <div class="planner-day">
+                <div class="planner-day-header">
+                    <div class="planner-day-number">{{ dia.numero }}</div>
+                    <div class="planner-day-name">{{ dia.nombre }}</div>
+                </div>
+                <div class="planner-writing-area">
+                    {% for ev in dia.eventos %}
+                    <a href="{% url 'expediente_detail' ev.pk %}"
+                       class="planner-event"
+                       style="border-left: 3px solid {% if ev.estado == 'audiencia' %}#eab308{% elif ev.estado == 'no_notificado' %}#ef4444{% elif ev.estado == 'convenio' %}#22c55e{% elif ev.estado == 'reprogramacion' %}#f97316{% else %}#3b82f6{% endif %};">
+                        <span class="planner-event-time">{{ ev.fecha_audiencia|date:"H:i" }}</span>
+                        <span class="planner-event-title">{{ ev.numero }}</span>
+                        <span class="planner-event-client">{{ ev.cliente.nombre }}</span>
+                    </a>
+                    {% empty %}
+                    <div class="planner-empty">Sin audiencias</div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <!-- Vista Calendario FullCalendar -->
+    <div class="bg-white rounded shadow-sm border border-gray-200 p-3">
+        <div id="calendar"></div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_head %}
+{% if vista_actual == 'planner' %}
+<style>
+    /* ─── Weekly Planner ─────────────────────────── */
+    .planner {
+        width: 100%;
+        background: #fff;
+        border: 1px solid #dcdcdc;
+        box-shadow: 0 2px 10px rgba(0,0,0,.08);
+    }
+    .planner-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 15px 25px;
+        background: #2a3340;
+        color: white;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .planner-month {
+        font-size: 1.6rem;
+        font-weight: 700;
+        letter-spacing: 2px;
+    }
+    .planner-week {
+        font-size: 1.1rem;
+        font-weight: 600;
+    }
+    .planner-nav {
+        display: flex;
+        gap: 6px;
+    }
+    .planner-nav-btn {
+        display: inline-block;
+        padding: 4px 12px;
+        background: rgba(255,255,255,0.15);
+        color: white;
+        text-decoration: none;
+        font-size: 11px;
+        font-weight: 600;
+        border-radius: 3px;
+        transition: background 0.15s;
+    }
+    .planner-nav-btn:hover {
+        background: rgba(255,255,255,0.3);
+    }
+    .planner-days {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+    }
+    .planner-day {
+        border-right: 1px solid #d6d6d6;
+        min-height: 700px;
+    }
+    .planner-day:last-child {
+        border-right: none;
+    }
+    .planner-day-header {
+        padding: 12px 15px;
+        border-bottom: 1px solid #d6d6d6;
+        background: #f8f9fa;
+    }
+    .planner-day-number {
+        font-size: 3rem;
+        font-weight: 700;
+        color: #47505e;
+        line-height: 1;
+    }
+    .planner-day-name {
+        font-size: 1rem;
+        margin-top: 4px;
+        color: #2a3340;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 600;
+    }
+    .planner-writing-area {
+        min-height: 620px;
+        padding: 8px;
+        background-image:
+            repeating-linear-gradient(
+                to bottom,
+                transparent 0px,
+                transparent 31px,
+                #e5e7eb 32px
+            );
+    }
+    .planner-event {
+        display: block;
+        padding: 6px 8px;
+        margin-bottom: 6px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 3px;
+        text-decoration: none;
+        transition: all 0.15s;
+        font-size: 11px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .planner-event:hover {
+        background: #f9fafb;
+        border-color: #d1d5db;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .planner-event-time {
+        font-weight: 700;
+        color: #47505e;
+        display: block;
+        font-size: 10px;
+    }
+    .planner-event-title {
+        font-weight: 600;
+        color: #2a3340;
+        display: block;
+    }
+    .planner-event-client {
+        color: #6b7280;
+        font-size: 10px;
+        display: block;
+    }
+    .planner-empty {
+        text-align: center;
+        color: #9ca3af;
+        font-size: 11px;
+        padding-top: 24px;
+    }
+    .planner-writing-area:has(.planner-empty) {
+        background-image:
+            repeating-linear-gradient(
+                to bottom,
+                transparent 0px,
+                transparent 31px,
+                #f3f4f6 32px
+            );
+    }
+    @media print {
+        body { padding: 0; background: white; }
+        .planner { box-shadow: none; border: none; }
+        .planner-day { min-height: 900px; }
+        .planner-nav, .planner-nav-btn { display: none; }
+    }
+    @media (max-width: 768px) {
+        .planner-days { grid-template-columns: 1fr; }
+        .planner-day:not(:first-child) { display: none; }
+        .planner-header { flex-direction: column; text-align: center; }
+    }
+</style>
+{% elif vista_actual == 'mes' or vista_actual == 'semana' %}
+<link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.min.css' rel='stylesheet' />
+<style>
+    .fc { font-size: 0.9em; }
+    .fc .fc-toolbar-title { font-size: 1em; color: #1e293b; }
+    .fc .fc-button-primary { background-color: #334155; border-color: #334155; }
+    .fc .fc-button-primary:hover { background-color: #1e293b; }
+    .fc .fc-button-primary:not(:disabled).fc-button-active { background-color: #0f172a; }
+    .fc .fc-daygrid-event { border-radius: 4px; padding: 2px 4px; font-size: 0.8em; }
+    .fc .fc-event-title { font-weight: 500; }
+</style>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+{% if vista_actual == 'mes' or vista_actual == 'semana' %}
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var calendarEl = document.getElementById('calendar');
+    var calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: '{{ vista_actual|default:"mes" }}' === 'semana' ? 'timeGridWeek' : 'dayGridMonth',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+        },
+        locale: 'es',
+        events: {{ eventos_json|safe }},
+        eventClick: function(info) {
+            if (info.event.url) {
+                window.location.href = info.event.url;
+            }
+        },
+        height: 'auto',
+        buttonText: {
+            today: 'Hoy',
+            month: 'Mes',
+            week: 'Semana',
+            day: 'Día',
+            list: 'Lista'
+        },
+        slotMinTime: '08:00:00',
+        slotMaxTime: '20:00:00',
+        allDaySlot: false,
+    });
+    calendar.render();
+});
+</script>
+{% endif %}
+{% endblock %}

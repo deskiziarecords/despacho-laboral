@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+{% block title %}{% if object %}Editar{% else %}Nuevo{% endif %} Movimiento de Caja - Despacho Laboral{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="flex items-center justify-between mb-3">
+        <h1 class="text-lg font-bold text-gray-800">
+            {% if object %}✏️ Editar Movimiento{% else %}📝 Nuevo Movimiento de Caja{% endif %}
+        </h1>
+        <a href="{% url 'cashmovement_list' %}" class="btn btn-sm">← Volver</a>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            {% if object %}Editando registro del {{ object.fecha|date:"d/m/Y" }}{% else %}Registrar ingreso o egreso{% endif %}
+        </div>
+        <div class="card-body">
+            <form method="post" class="space-y-3">
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                <div class="px-3 py-2 bg-red-50 text-red-700 border border-red-200 text-sm" style="border-radius: 3px;">
+                    {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+                </div>
+                {% endif %}
+
+                <!-- Primera fila: Fecha + Oficina -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[10px] text-gray-500 uppercase tracking-wider font-semibold block mb-0.5">Fecha</label>
+                        {{ form.fecha }}
+                        {% if form.fecha.errors %}<p class="text-red-500 text-[10px] mt-0.5">{{ form.fecha.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-500 uppercase tracking-wider font-semibold block mb-0.5">Oficina</label>
+                        {{ form.oficina }}
+                        {% if form.oficina.errors %}<p class="text-red-500 text-[10px] mt-0.5">{{ form.oficina.errors.0 }}</p>{% endif %}
+                    </div>
+                </div>
+
+                <!-- Segunda fila: Tipo de Movimiento -->
+                <div>
+                    <label class="text-[10px] text-gray-500 uppercase tracking-wider font-semibold block mb-0.5">Tipo de Movimiento</label>
+                    <div class="flex gap-4 mt-1">
+                        {% for radio in form.tipo %}
+                        <label class="flex items-center gap-1.5 text-sm font-medium cursor-pointer">
+                            {{ radio.tag }}
+                            <span class="{% if radio.choice_label == '💰 Ingreso' %}text-green-700{% else %}text-red-700{% endif %}">
+                                {{ radio.choice_label }}
+                            </span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    {% if form.tipo.errors %}<p class="text-red-500 text-[10px] mt-0.5">{{ form.tipo.errors.0 }}</p>{% endif %}
+                </div>
+
+                <!-- Tercera fila: Categoría + Monto -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-[10px] text-gray-500 uppercase tracking-wider font-semibold block mb-0.5">Categoría</label>
+                        {{ form.categoria }}
+                        {% if form.categoria.errors %}<p class="text-red-500 text-[10px] mt-0.5">{{ form.categoria.errors.0 }}</p>{% endif %}
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-gray-500 uppercase tracking-wider font-semibold block mb-0.5">Monto ($)</label>
+                        {{ form.monto }}
+                        {% if form.monto.errors %}<p class="text-red-500 text-[10px] mt-0.5">{{ form.monto.errors.0 }}</p>{% endif %}
+                    </div>
+                </div>
+
+                <!-- Descripción -->
+                <div>
+                    <label class="text-[10px] text-gray-500 uppercase tracking-wider font-semibold block mb-0.5">Descripción</label>
+                    {{ form.descripcion }}
+                    {% if form.descripcion.errors %}<p class="text-red-500 text-[10px] mt-0.5">{{ form.descripcion.errors.0 }}</p>{% endif %}
+                </div>
+
+                <!-- Referencia -->
+                <div>
+                    <label class="text-[10px] text-gray-500 uppercase tracking-wider font-semibold block mb-0.5">Referencia <span class="text-gray-400 font-normal">(opcional)</span></label>
+                    {{ form.referencia }}
+                    {% if form.referencia.errors %}<p class="text-red-500 text-[10px] mt-0.5">{{ form.referencia.errors.0 }}</p>{% endif %}
+                    <p class="text-[10px] text-gray-400 mt-0.5">N° de expediente, factura o nota relacionada</p>
+                </div>
+
+                <!-- Botones -->
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-gray-200">
+                    <a href="{% url 'cashmovement_list' %}" class="btn">Cancelar</a>
+                    <button type="submit" class="btn btn-success">
+                        {% if object %}💾 Guardar cambios{% else %}✅ Registrar movimiento{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Actualizar categorías según el tipo seleccionado
+document.addEventListener('DOMContentLoaded', function() {
+    var tipoRadios = document.querySelectorAll('input[name="tipo"]');
+    var categoriaSelect = document.getElementById('id_categoria');
+
+    function actualizarCategorias() {
+        var tipo = document.querySelector('input[name="tipo"]:checked');
+        if (!tipo) return;
+
+        var esIngreso = tipo.value === 'ingreso';
+        var categoriasIngreso = [
+            ['convenio', '🤝 Pago de convenio'],
+            ['cliente', '👤 Pago de cliente'],
+            ['anticipo', '📋 Anticipo'],
+            ['devolucion', '↩️ Devolución'],
+            ['otro_ingreso', '🔄 Otro ingreso'],
+        ];
+        var categoriasEgreso = [
+            ['papeleria', '📎 Papelería'],
+            ['gasolina', '⛽ Gasolina'],
+            ['renta', '🏢 Renta'],
+            ['luz', '💡 Luz'],
+            ['agua', '🚰 Agua'],
+            ['internet', '🌐 Internet'],
+            ['telefono', '📞 Teléfono'],
+            ['viaticos', '🚗 Viáticos'],
+            ['comisiones', '👥 Comisiones'],
+            ['honorarios', '⚖️ Honorarios'],
+            ['otro_egreso', '🔄 Otro egreso'],
+        ];
+
+        var opciones = esIngreso ? categoriasIngreso : categoriasEgreso;
+        categoriaSelect.innerHTML = '';
+        opciones.forEach(function(op) {
+            var opt = document.createElement('option');
+            opt.value = op[0];
+            opt.textContent = op[1];
+            categoriaSelect.appendChild(opt);
+        });
+    }
+
+    tipoRadios.forEach(function(radio) {
+        radio.addEventListener('change', actualizarCategorias);
+    });
+
+    // Inicializar categorías
+    actualizarCategorias();
+});
+</script>
+{% endblock %}

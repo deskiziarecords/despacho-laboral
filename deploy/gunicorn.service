@@ -1,0 +1,32 @@
+[Unit]
+Description=Despacho Laboral - Gunicorn
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+RuntimeDirectory=gunicorn
+WorkingDirectory=/opt/despacho-laboral
+
+# Archivo de ambiente con variables de producción
+EnvironmentFile=/opt/despacho-laboral/.env
+
+# Ejecutar con uv (gestor de paquetes del proyecto)
+ExecStart=/opt/despacho-laboral/.venv/bin/gunicorn \
+    --workers 3 \
+    --worker-tmp-dir /dev/shm \
+    --bind unix:/run/gunicorn/gunicorn.sock \
+    --access-logfile /var/log/gunicorn/access.log \
+    --error-logfile /var/log/gunicorn/error.log \
+    config.wsgi:application
+
+ExecReload=/bin/kill -s HUP $MAINPID
+ExecStop=/bin/kill -s TERM $MAINPID
+
+# Reinicio automático si falla
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

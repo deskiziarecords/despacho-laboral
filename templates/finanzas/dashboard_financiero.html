@@ -1,0 +1,418 @@
+{% extends 'base.html' %}
+{% load static custom_filters %}
+{% block title %}Dashboard Financiero - Despacho Laboral{% endblock %}
+
+{% block content %}
+<div class="space-y-3">
+    <!-- Encabezado -->
+    <div class="flex items-center justify-between">
+        <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <img src="{% static 'svg/bank-outline.svg' %}" class="w-5 h-5 icon-darkblue">
+            Dashboard Financiero
+        </h1>
+        <div class="flex items-center space-x-2">
+            <a href="{% url 'exportar_dashboard_financiero_excel' %}?{{ request.GET.urlencode }}"
+               class="btn btn-sm" style="background:#3d6b4d; color:white; border-color:#2d523a;">
+                <img src="{% static 'svg/arrow-down-bold-box-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Exportar Excel
+            </a>
+            <!-- Filtro por periodo -->
+            <form method="get" class="flex items-center space-x-2">
+                <select name="periodo" onchange="cargarFlujo()"
+                        class="text-xs px-2 py-1 border border-gray-300" style="border-radius: 3px;">
+                    <option value="mes" {% if periodo == 'mes' %}selected{% endif %}>Este mes</option>
+                    <option value="anio" {% if periodo == 'anio' %}selected{% endif %}>Este año</option>
+                    <option value="todo" {% if periodo == 'todo' %}selected{% endif %}>Histórico</option>
+                </select>
+                <select name="oficina" onchange="cargarFlujo()"
+                        class="text-xs px-2 py-1 border border-gray-300" style="border-radius: 3px;">
+                    <option value="">Todas las oficinas</option>
+                    {% for of in oficinas %}
+                    <option value="{{ of.pk }}" {% if oficina_seleccionada == of.pk %}selected{% endif %}>
+                        {{ of.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% if request.GET.periodo or request.GET.oficina %}
+                <a href="{% url 'dashboard_financiero' %}" class="text-xs text-gray-500 hover:text-gray-700">✕ Limpiar</a>
+                {% endif %}
+            </form>
+            <span class="text-xs text-gray-400">{{ etiqueta_periodo }}</span>
+        </div>
+    </div>
+
+    <!-- Cards de resumen global -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-2">
+        <div class="card p-3" style="border-left: 3px solid #3d6b4d;">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider flex items-center gap-1"><img src="{% static 'svg/account-cash.svg' %}" class="w-3 h-3 icon-darkblue"> Ingresos</div>
+            <div class="text-xl font-bold text-green-700">${{ total_ingresos|floatformat:0|intcomma }}</div>
+            <div class="text-[10px] text-gray-400 mt-1">
+                Pagos: ${{ ingresos_pagos|floatformat:0|intcomma }} · Caja: ${{ ingresos_caja|floatformat:0|intcomma }}
+            </div>
+        </div>
+        <div class="card p-3" style="border-left: 3px solid #8b3a3a;">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider flex items-center gap-1"><img src="{% static 'svg/account-cash.svg' %}" class="w-3 h-3 icon-darkblue"> Gastos</div>
+            <div class="text-xl font-bold text-red-700">${{ total_gastos|floatformat:0|intcomma }}</div>
+            <div class="text-[10px] text-gray-400 mt-1">
+                Operación: ${{ gastos_expense|floatformat:0|intcomma }} · Nómina: ${{ gastos_nomina|floatformat:0|intcomma }}
+            </div>
+        </div>
+        <div class="card p-3" style="border-left: 3px solid {% if utilidad_positivo %}#3d6b4d{% else %}#8b3a3a{% endif %};">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider flex items-center gap-1"><img src="{% static 'svg/monitor-dashboard.svg' %}" class="w-3 h-3 icon-darkblue"> Utilidad</div>
+            <div class="text-xl font-bold {% if utilidad_positivo %}text-green-700{% else %}text-red-700{% endif %}">
+                ${{ utilidad|floatformat:0|intcomma }}
+            </div>
+            <div class="text-[10px] text-gray-400 mt-1">
+                {% if total_ingresos > 0 %}
+                Margen: {{ utilidad|floatformat:0|div:total_ingresos|floatformat:1|multiply:100 }}%
+                {% endif %}
+            </div>
+        </div>
+        <div class="card p-3" style="border-left: 3px solid #47505e;">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider flex items-center gap-1"><img src="{% static 'svg/bank-outline.svg' %}" class="w-3 h-3 icon-darkblue"> Oficinas</div>
+            <div class="text-xl font-bold text-gray-800">{{ resumen_oficinas|length }}</div>
+            <div class="text-[10px] text-gray-400 mt-1">Activas en el sistema</div>
+        </div>
+    </div>
+
+    <!-- Desglose Ingresos vs Gastos (barra visual) -->
+    <div class="card">
+        <div class="card-header flex items-center gap-1.5"><img src="{% static 'svg/monitor-dashboard.svg' %}" class="w-4 h-4 icon-darkblue"> Ingresos vs Gastos</div>
+        <div class="card-body">
+            {% if total_ingresos > 0 or total_gastos > 0 %}
+            <div class="space-y-2">
+                <div>
+                    <div class="flex items-center justify-between text-xs mb-1">
+                        <span class="font-medium text-green-700">Ingresos</span>
+                        <span class="text-gray-500">${{ total_ingresos|floatformat:0|intcomma }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200" style="height: 20px; border-radius: 3px;">
+                        {% with total=total_ingresos|add:total_gastos %}
+                        {% if total > 0 %}
+                        <div class="h-full bg-green-600" style="width: {{ total_ingresos|div:total|multiply:100|floatformat:1 }}%; border-radius: 3px; min-width: 4px;"></div>
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+                </div>
+                <div>
+                    <div class="flex items-center justify-between text-xs mb-1">
+                        <span class="font-medium text-red-700">Gastos</span>
+                        <span class="text-gray-500">${{ total_gastos|floatformat:0|intcomma }}</span>
+                    </div>
+                    <div class="w-full bg-gray-200" style="height: 20px; border-radius: 3px;">
+                        {% with total=total_ingresos|add:total_gastos %}
+                        {% if total > 0 %}
+                        <div class="h-full bg-red-500" style="width: {{ total_gastos|div:total|multiply:100|floatformat:1 }}%; border-radius: 3px; min-width: 4px;"></div>
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <p class="text-gray-400 text-sm py-2 text-center">No hay datos financieros para el período seleccionado.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Gráfico de Flujo de Caja Mensual -->
+    <div class="card">
+        <div class="card-header flex items-center justify-between">
+            <span class="flex items-center gap-1.5"><img src="{% static 'svg/monitor-dashboard.svg' %}" class="w-4 h-4 icon-darkblue"> Flujo de Caja Mensual (12 meses)</span>
+            <div class="flex items-center space-x-3 text-xs">
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#3d6b4d;display:inline-block;"></span> Ingresos</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#8b3a3a;display:inline-block;"></span> Gastos</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded" style="background:#2563eb;display:inline-block;"></span> Utilidad</span>
+            </div>
+        </div>
+        <div class="card-body">
+            <canvas id="cashflowChart" height="90"></canvas>
+        </div>
+    </div>
+
+    <!-- Resumen por oficina -->
+    <div class="card">
+        <div class="card-header flex items-center gap-1.5"><img src="{% static 'svg/bank-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Resumen por Oficina</div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr>
+                        <th>Oficina</th>
+                        <th class="text-right">Ingresos</th>
+                        <th class="text-right">Gastos</th>
+                        <th class="text-right">Utilidad</th>
+                        <th class="text-center">Margen</th>
+                        <th class="text-right">Comisiones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for of in resumen_oficinas %}
+                    <tr>
+                        <td class="font-medium">{{ of.oficina.nombre }}</td>
+                        <td class="text-right text-green-700 font-medium">${{ of.ingresos|floatformat:0|intcomma }}</td>
+                        <td class="text-right text-red-700 font-medium">${{ of.gastos|floatformat:0|intcomma }}</td>
+                        <td class="text-right font-bold {% if of.utilidad >= 0 %}text-green-700{% else %}text-red-700{% endif %}">
+                            ${{ of.utilidad|floatformat:0|intcomma }}
+                        </td>
+                        <td class="text-center">
+                            {% if of.ingresos > 0 %}
+                            <span class="badge {% if of.utilidad >= 0 %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+                                {{ of.utilidad|floatformat:0|div:of.ingresos|floatformat:1|multiply:100 }}%
+                            </span>
+                            {% else %}
+                            <span class="badge bg-gray-100 text-gray-500">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-right text-amber-700">${{ of.comisiones_pagadas|floatformat:0|intcomma }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-gray-400 py-6">No hay oficinas registradas.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <!-- Gastos por Categoría -->
+        <div class="card">
+            <div class="card-header flex items-center gap-1.5"><img src="{% static 'svg/file-document-multiple-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Gastos por Categoría</div>
+            <div class="card-body">
+                {% if gastos_por_categoria %}
+                <div class="space-y-1.5">
+                    {% for g in gastos_por_categoria %}
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-gray-600">{{ g.get_categoria_display }}</span>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-24 bg-gray-200" style="height: 8px; border-radius: 2px;">
+                                <div class="h-full bg-red-500" style="width: {{ g.total|div:gastos_por_categoria.0.total|multiply:100|floatformat:1 }}%; border-radius: 2px; min-width: 4px;"></div>
+                            </div>
+                            <span class="font-medium text-gray-700 w-16 text-right">${{ g.total|floatformat:0|intcomma }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-gray-400 text-sm py-2 text-center">Sin gastos registrados.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Formas de Pago -->
+        <div class="card">
+            <div class="card-header flex items-center gap-1.5"><img src="{% static 'svg/bank-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Formas de Pago (Ingresos)</div>
+            <div class="card-body">
+                {% if formas_pago %}
+                <div class="space-y-1.5">
+                    {% for f in formas_pago %}
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-gray-600">{{ f.get_forma_pago_display }}</span>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-24 bg-gray-200" style="height: 8px; border-radius: 2px;">
+                                <div class="h-full bg-green-600" style="width: {{ f.total|div:formas_pago.0.total|multiply:100|floatformat:1 }}%; border-radius: 2px; min-width: 4px;"></div>
+                            </div>
+                            <span class="font-medium text-gray-700 w-16 text-right">${{ f.total|floatformat:0|intcomma }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-gray-400 text-sm py-2 text-center">Sin ingresos registrados.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Productividad por Asesor -->
+    <div class="card">
+        <div class="card-header flex items-center gap-1.5"><img src="{% static 'svg/account.svg' %}" class="w-4 h-4 icon-darkblue"> Productividad por Asesor</div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr>
+                        <th>Asesor</th>
+                        <th class="text-center">Casos</th>
+                        <th class="text-center">Activos</th>
+                        <th class="text-center">Convenios</th>
+                        <th class="text-right">Monto Recuperado</th>
+                        <th class="text-right">Comisiones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for a in asesores %}
+                    <tr>
+                        <td class="font-medium">{{ a.asesor.get_full_name|default:a.asesor.username }}</td>
+                        <td class="text-center">{{ a.total_casos }}</td>
+                        <td class="text-center text-amber-700">{{ a.casos_activos }}</td>
+                        <td class="text-center text-green-700">{{ a.convenios }}</td>
+                        <td class="text-right font-medium text-green-700">${{ a.monto_recuperado|floatformat:0|intcomma }}</td>
+                        <td class="text-right text-amber-700">${{ a.comisiones|floatformat:0|intcomma }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-gray-400 py-6">No hay asesores activos.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Movimientos de Caja Recientes -->
+    <div class="card">
+        <div class="card-header flex items-center gap-1.5"><img src="{% static 'svg/account-cash.svg' %}" class="w-4 h-4 icon-darkblue"> Movimientos de Caja Recientes</div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Oficina</th>
+                        <th>Tipo</th>
+                        <th>Categoría</th>
+                        <th class="text-right">Monto</th>
+                        <th>Descripción</th>
+                        <th>Registrado por</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for m in caja_reciente %}
+                    <tr>
+                        <td class="text-gray-600">{{ m.fecha|date:"d/m/Y" }}</td>
+                        <td>{{ m.oficina.nombre }}</td>
+                        <td>
+                            <span class="badge {% if m.tipo == 'ingreso' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+                                {{ m.get_tipo_display }}
+                            </span>
+                        </td>
+                        <td class="text-gray-600">{{ m.get_categoria_display }}</td>
+                        <td class="text-right font-medium {% if m.tipo == 'ingreso' %}text-green-700{% else %}text-red-700{% endif %}">
+                            ${{ m.monto|floatformat:0|intcomma }}
+                        </td>
+                        <td class="text-gray-500 max-w-xs truncate">{{ m.descripcion|truncatechars:40 }}</td>
+                        <td class="text-gray-500">{{ m.registrado_por.get_full_name|default:m.registrado_por.username }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center text-gray-400 py-6">No hay movimientos de caja registrados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+var cashflowChart = null;
+
+function initChart(labels, ingresos, gastos, utilidad) {
+    var ctx = document.getElementById('cashflowChart');
+    if (!ctx) return;
+
+    if (cashflowChart) {
+        cashflowChart.destroy();
+    }
+
+    cashflowChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Ingresos',
+                    data: ingresos,
+                    backgroundColor: 'rgba(61, 107, 77, 0.75)',
+                    borderColor: '#3d6b4d',
+                    borderWidth: 1,
+                    borderRadius: 2,
+                },
+                {
+                    label: 'Gastos',
+                    data: gastos,
+                    backgroundColor: 'rgba(139, 58, 58, 0.75)',
+                    borderColor: '#8b3a3a',
+                    borderWidth: 1,
+                    borderRadius: 2,
+                },
+                {
+                    label: 'Utilidad',
+                    data: utilidad,
+                    type: 'line',
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                    pointBackgroundColor: '#2563eb',
+                    pointRadius: 3,
+                    pointHoverRadius: 5,
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: true,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            return ctx.dataset.label + ': $' + ctx.raw.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { size: 10 } }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        font: { size: 10 },
+                        callback: function(value) {
+                            if (value >= 1000000) return '$' + (value / 1000000).toFixed(1) + 'M';
+                            if (value >= 1000) return '$' + (value / 1000).toFixed(0) + 'K';
+                            return '$' + value;
+                        }
+                    },
+                    grid: { color: 'rgba(0,0,0,0.06)' }
+                }
+            }
+        }
+    });
+}
+
+function cargarFlujo() {
+    var selects = document.querySelectorAll('select[name="periodo"], select[name="oficina"]');
+    var params = new URLSearchParams();
+    selects.forEach(function(s) {
+        if (s.value) params.set(s.name, s.value);
+    });
+
+    fetch('{% url "api_flujo_mensual" %}?' + params.toString())
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.labels) {
+                initChart(data.labels, data.ingresos, data.gastos, data.utilidad);
+            }
+        })
+        .catch(function(err) {
+            console.error('Error cargando flujo mensual:', err);
+        });
+}
+
+// Inicializar chart con datos del servidor al cargar la pagina
+(function() {
+    var labels = {{ meses_labels|safe }};
+    var ingresos = {{ ingresos_meses|safe }};
+    var gastos = {{ gastos_meses|safe }};
+    var utilidad = {{ utilidad_meses|safe }};
+    initChart(labels, ingresos, gastos, utilidad);
+})();
+</script>
+{% endblock %}

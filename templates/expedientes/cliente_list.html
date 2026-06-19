@@ -1,0 +1,97 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Clientes - Despacho Laboral{% endblock %}
+
+{% block content %}
+<div class="space-y-3">
+    <div class="flex items-center justify-between">
+        <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <img src="{% static 'svg/account.svg' %}" class="w-5 h-5 icon-darkblue">
+            Clientes
+        </h1>
+        <a href="{% url 'cliente_create' %}" class="btn btn-primary">+ Nuevo Cliente</a>
+    </div>
+
+    <div class="card">
+        <form method="get" class="flex space-x-2 p-3">
+            <input type="text" name="q" placeholder="Buscar por nombre, CURP, empresa o teléfono..."
+                   value="{{ filtros.q|default:'' }}" class="flex-1">
+            <button type="submit" class="btn btn-primary">Buscar</button>
+            {% if filtros.q %}
+            <a href="{% url 'cliente_list' %}" class="btn">Limpiar</a>
+            {% endif %}
+        </form>
+    </div>
+
+    <div class="card overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>CURP</th>
+                        <th>Teléfono</th>
+                        <th>Asesoría</th>
+                        <th>Empresa</th>
+                        <th>Creado</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for cliente in object_list %}
+                    <tr>
+                        <td class="font-medium">{{ cliente.nombre }}</td>
+                        <td class="font-mono">{{ cliente.curp }}</td>
+                        <td>{{ cliente.telefono }}</td>
+                        <td>
+                            {% if cliente.asesoria_gratuita_agendada and cliente.fecha_asesoria_gratuita %}
+                            <span class="px-2 py-0.5 text-xs rounded-full bg-green-100 text-green-700 font-medium">
+                                📅 {{ cliente.fecha_asesoria_gratuita|date:"d/m/Y" }}
+                            </span>
+                            {% elif cliente.asesoria_gratuita_ofrecida %}
+                            <span class="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 font-medium">
+                                💬 Ofrecida
+                            </span>
+                            {% else %}
+                            <span class="text-xs text-gray-400">—</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ cliente.empresa|default:'—' }}</td>
+                        <td class="text-gray-500">{{ cliente.created_at|date:"d/m/Y" }}</td>
+                        <td>
+                            <a href="{% url 'cliente_update' cliente.pk %}" class="btn btn-sm">Editar</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center text-gray-400 py-8">
+                            No hay clientes registrados.
+                            <a href="{% url 'cliente_create' %}" class="block text-sm text-blue-700 hover:text-blue-900 mt-1">Crear primer cliente →</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="flex items-center justify-between" style="padding: 6px 10px; background: #fff; border: 1px solid #d4d6d9; border-radius: 3px;">
+        <div class="text-xs text-gray-500">
+            Mostrando {{ page_obj.start_index }} - {{ page_obj.end_index }} de {{ page_obj.paginator.count }}
+        </div>
+        <div class="flex space-x-1">
+            {% if page_obj.has_previous %}
+            <a href="?page=1{% if filtros.q %}&q={{ filtros.q }}{% endif %}" class="btn btn-sm">Primera</a>
+            <a href="?page={{ page_obj.previous_page_number }}{% if filtros.q %}&q={{ filtros.q }}{% endif %}" class="btn btn-sm">Anterior</a>
+            {% endif %}
+            <span class="btn btn-sm btn-primary">Pág. {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% if filtros.q %}&q={{ filtros.q }}{% endif %}" class="btn btn-sm">Siguiente</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}{% if filtros.q %}&q={{ filtros.q }}{% endif %}" class="btn btn-sm">Última</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,237 @@
+{% extends 'base.html' %}
+{% load static custom_filters %}
+{% block title %}Panel Superadmin - Despacho Laboral{% endblock %}
+
+{% block content %}
+<div class="space-y-3">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <img src="{% static 'svg/cog-outline.svg' %}" class="w-5 h-5 icon-darkblue">
+                Panel Superadmin
+            </h1>
+            <p class="text-xs text-gray-500">Auditoría completa del sistema - {{ fecha_generacion|date:"d/m/Y H:i" }}</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <a href="{% url 'matriz_permisos' %}" class="btn btn-primary">
+                <img src="{% static 'svg/key.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Matriz de Permisos
+            </a>
+            <a href="{% url 'exportar_excel' %}" class="btn">
+                <img src="{% static 'svg/arrow-down-bold-box-outline.svg' %}" class="w-3.5 h-3.5 icon-darkblue"> Exportar Excel
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-3 md:grid-cols-6 gap-2">
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Usuarios</div>
+            <div class="text-lg font-bold text-gray-800">{{ total_usuarios }}</div>
+            <div class="text-[10px] text-gray-400 mt-0.5">{{ total_asesores }} ases. · {{ total_admins }} adm.</div>
+        </div>
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Expedientes</div>
+            <div class="text-lg font-bold text-gray-800">{{ total_expedientes }}</div>
+        </div>
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Clientes</div>
+            <div class="text-lg font-bold text-gray-800">{{ total_clientes }}</div>
+        </div>
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Documentos</div>
+            <div class="text-lg font-bold text-gray-800">{{ total_documentos }}</div>
+        </div>
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Movimientos</div>
+            <div class="text-lg font-bold text-gray-800">{{ total_movimientos }}</div>
+        </div>
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Total Reclamado</div>
+            <div class="text-base font-bold text-gray-800">${{ total_reclamado|floatformat:0|intcomma }}</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <!-- Actividad Reciente -->
+        <div class="lg:col-span-2 card">
+            <div class="card-header flex items-center gap-1.5"><img src="{% static 'svg/monitor-dashboard.svg' %}" class="w-4 h-4 icon-darkblue"> Actividad Reciente</div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Usuario</th>
+                            <th>Rol</th>
+                            <th>Acción</th>
+                            <th>Expediente</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for mov in actividad_reciente %}
+                        <tr>
+                            <td class="text-gray-500">{{ mov.created_at|date:"d/m H:i" }}</td>
+                            <td class="font-medium">{{ mov.usuario.get_full_name|default:mov.usuario.username }}</td>
+                            <td>
+                                <span class="badge
+                                    {% if mov.usuario.profile.rol == 'superadmin' %}bg-gray-700 text-white
+                                    {% elif mov.usuario.profile.rol == 'admin' %}bg-blue-100 text-blue-700
+                                    {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                    {{ mov.usuario.profile.get_rol_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge
+                                    {% if mov.accion == 'creacion' %}bg-green-100 text-green-700
+                                    {% elif mov.accion == 'cambio_estado' %}bg-yellow-100 text-yellow-700
+                                    {% elif mov.accion == 'subida_documento' %}bg-blue-100 text-blue-700
+                                    {% elif mov.accion == 'nota_agregada' %}bg-purple-100 text-purple-700
+                                    {% elif mov.accion == 'resultado_audiencia' %}bg-amber-100 text-amber-700
+                                    {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                    {{ mov.get_accion_display }}
+                                </span>
+                            </td>
+                            <td>
+                                <a href="{% url 'expediente_detail' mov.expediente.pk %}" class="text-blue-700 hover:text-blue-900">
+                                    {{ mov.expediente.numero }}
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-gray-400 py-6">No hay actividad registrada.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="space-y-3">
+            <div class="card">
+                <div class="card-header flex items-center gap-1.5"><img src="{% static 'svg/monitor-dashboard.svg' %}" class="w-4 h-4 icon-darkblue"> Actividad del Sistema</div>
+                <div class="card-body space-y-2">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Movimientos (7 días)</span>
+                        <span class="font-bold">{{ movimientos_7d }}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Movimientos (30 días)</span>
+                        <span class="font-bold">{{ movimientos_30d }}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Exp. creados (7 días)</span>
+                        <span class="font-bold">{{ expedientes_creados_7d }}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Exp. creados (30 días)</span>
+                        <span class="font-bold">{{ expedientes_creados_30d }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header flex items-center gap-1.5"><img src="{% static 'svg/account.svg' %}" class="w-4 h-4 icon-darkblue"> Usuarios Activos</div>
+                <div class="card-body space-y-2">
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Activos (7 días)</span>
+                        <span class="font-bold">{{ usuarios_activos_7d }}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Activos (30 días)</span>
+                        <span class="font-bold">{{ usuarios_activos_30d }}</span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-600">Nunca ingresaron</span>
+                        <span class="font-bold text-red-700">{{ usuarios_sin_login }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header flex items-center gap-1.5"><img src="{% static 'svg/monitor-dashboard.svg' %}" class="w-4 h-4 icon-darkblue"> Exp. por Estado</div>
+                <div class="card-body space-y-1">
+                    {% for estado, count in casos_por_estado.items %}
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="flex items-center gap-1.5">
+                            {% if 'Convenio' in estado %}
+                            <img src="{% static 'svg/convenio.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% elif 'Demanda' in estado %}
+                            <img src="{% static 'svg/demanda.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% elif 'Reprogramaci' in estado %}
+                            <img src="{% static 'svg/reprogramacion.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% elif 'Nuevo' in estado %}
+                            <img src="{% static 'svg/file-document-multiple-outline.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% elif 'Citatorio' in estado %}
+                            <img src="{% static 'svg/citatorio.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% elif 'Solicitud' in estado %}
+                            <img src="{% static 'svg/file-edit-outline.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% elif 'Audiencia' in estado %}
+                            <img src="{% static 'svg/audiencia.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% elif 'No notificado' in estado or 'Sin conciliaci' in estado %}
+                            <img src="{% static 'svg/alert-box-outline.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% elif 'Cerrado' in estado %}
+                            <img src="{% static 'svg/check.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% else %}
+                            <img src="{% static 'svg/monitor-dashboard.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% endif %}
+                            {{ estado }}
+                        </span>
+                        <span class="font-bold">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de Usuarios -->
+    <div class="card">
+        <div class="card-header flex items-center justify-between">
+            <span class="flex items-center gap-1.5"><img src="{% static 'svg/account.svg' %}" class="w-4 h-4 icon-darkblue"> Auditoría de Usuarios</span>
+            <span class="text-xs font-normal text-gray-500 normal-case">{{ total_usuarios }} usuarios registrados</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr>
+                        <th>Usuario</th>
+                        <th>Nombre</th>
+                        <th>Rol</th>
+                        <th class="text-center">Staff</th>
+                        <th class="text-center">Activo</th>
+                        <th>Último Acceso</th>
+                        <th class="text-center">Casos</th>
+                        <th class="text-center">Mov.</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for u in usuarios %}
+                    <tr class="{% if not u.es_activo %}bg-red-50{% endif %}">
+                        <td class="font-mono">{{ u.user.username }}</td>
+                        <td>{{ u.user.get_full_name|default:'—' }}</td>
+                        <td>
+                            <span class="badge
+                                {% if u.rol == 'superadmin' %}bg-gray-700 text-white
+                                {% elif u.rol == 'admin' %}bg-blue-100 text-blue-700
+                                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                {{ u.rol|capfirst }}
+                            </span>
+                        </td>
+                        <td class="text-center">{% if u.es_staff %}<span class="text-gray-700">✓</span>{% else %}—{% endif %}</td>
+                        <td class="text-center">{% if u.es_activo %}<span class="inline-block w-2 h-2 bg-gray-700" style="border-radius: 1px;"></span>{% else %}<span class="inline-block w-2 h-2 bg-red-500" style="border-radius: 1px;"></span>{% endif %}</td>
+                        <td class="text-sm">
+                            {% if u.ultimo_acceso %}
+                            {{ u.ultimo_acceso|date:"d/m/Y H:i" }}
+                            {% else %}<span class="text-gray-400">Nunca</span>{% endif %}
+                        </td>
+                        <td class="text-center">{{ u.total_expedientes }}</td>
+                        <td class="text-center">{{ u.total_movimientos }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

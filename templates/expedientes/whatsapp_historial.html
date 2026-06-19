@@ -1,0 +1,47 @@
+{% if mensajes %}
+<div class="space-y-3">
+    {% for msg in mensajes %}
+    <div class="flex space-x-3 {% if msg.estado == 'fallido' %}opacity-75{% endif %}">
+        <div class="flex-shrink-0">
+            <div class="w-8 h-8 {% if msg.estado == 'enviado' %}bg-green-100{% elif msg.estado == 'fallido' %}bg-red-100{% else %}bg-gray-100{% endif %} rounded-full flex items-center justify-center">
+                <span class="{% if msg.estado == 'enviado' %}text-green-600{% elif msg.estado == 'fallido' %}text-red-600{% else %}text-gray-600{% endif %} text-sm">
+                    {% if msg.estado == 'enviado' %}✅{% elif msg.estado == 'fallido' %}❌{% else %}⏳{% endif %}
+                </span>
+            </div>
+        </div>
+        <div class="flex-1 {% if msg.estado == 'fallido' %}bg-red-50{% else %}bg-gray-50{% endif %} rounded-lg p-3">
+            <div class="flex items-center justify-between mb-1">
+                <span class="flex items-center space-x-2">
+                    <span class="font-medium text-gray-800 text-sm">{{ msg.get_tipo_display }}</span>
+                    {% if msg.via == 'twilio' %}
+                    <span class="px-1.5 py-0.5 rounded text-xs bg-blue-100 text-blue-700">API</span>
+                    {% else %}
+                    <span class="px-1.5 py-0.5 rounded text-xs bg-green-100 text-green-700">Deep Link</span>
+                    {% endif %}
+                </span>
+                <span class="text-xs text-gray-500">{{ msg.created_at|date:"d/m/Y H:i" }}</span>
+            </div>
+            <p class="text-gray-700 text-sm whitespace-pre-wrap">{{ msg.mensaje|truncatechars:200 }}</p>
+            <div class="flex items-center justify-between mt-2">
+                <span class="text-xs text-gray-500">📞 {{ msg.destino }} · {{ msg.enviado_por.get_full_name|default:msg.enviado_por.username }}</span>
+                {% if msg.link_generado %}
+                <a href="{{ msg.link_generado }}" target="_blank"
+                   class="text-xs text-green-600 hover:text-green-800 font-medium">
+                    Abrir WhatsApp →
+                </a>
+                {% endif %}
+            </div>
+            {% if msg.error_log %}
+            <p class="text-xs text-red-500 mt-1">{{ msg.error_log }}</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-8">
+    <div class="text-4xl mb-2">💬</div>
+    <p class="text-gray-500">No hay mensajes de WhatsApp registrados.</p>
+    <p class="text-xs text-gray-400 mt-1">Los mensajes que envíes aparecerán aquí.</p>
+</div>
+{% endif %}

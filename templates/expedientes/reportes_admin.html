@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+{% load static custom_filters %}
+{% block title %}Reportes - Despacho Laboral{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <h1 class="text-base font-bold text-gray-800 flex items-center gap-2">
+        <img src="{% static 'svg/monitor-dashboard.svg' %}" class="w-5 h-5 icon-darkblue">
+        Reportes Administrativos
+    </h1>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
+            <div class="text-sm text-gray-500 mb-1">Total Casos</div>
+            <div class="text-lg font-bold text-gray-800">{{ total_casos }}</div>
+        </div>
+        <div class="bg-white rounded shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
+            <div class="text-sm text-gray-500 mb-1">Casos Cerrados</div>
+            <div class="text-lg font-bold text-green-700">{{ total_cerrados }}</div>
+        </div>
+        <div class="bg-white rounded shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
+            <div class="text-sm text-gray-500 mb-1">Convenios</div>
+            <div class="text-lg font-bold text-emerald-700">{{ total_convenios }}</div>
+        </div>
+        <div class="bg-white rounded shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow">
+            <div class="text-sm text-gray-500 mb-1">Demandas</div>
+            <div class="text-lg font-bold text-red-700">{{ total_demandas }}</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Casos por Asesor -->
+        <div class="bg-white rounded shadow-sm border border-gray-200">
+            <div class="px-4 py-2.5 border-b border-gray-200">
+                <h2 class="text-sm font-semibold text-gray-800 flex items-center gap-1.5"><img src="{% static 'svg/account.svg' %}" class="w-4 h-4 icon-darkblue"> Casos por Asesor</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asesor</th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Total</th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Activos</th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Cerrados</th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Convenios</th>
+                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Demandas</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for asesor in asesores %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-3 py-2 text-xs font-medium">{{ asesor.get_full_name|default:asesor.username }}</td>
+                            <td class="px-3 py-2 text-xs text-center font-bold">{{ asesor.total_casos }}</td>
+                            <td class="px-3 py-2 text-xs text-center text-yellow-600">{{ asesor.casos_activos }}</td>
+                            <td class="px-3 py-2 text-xs text-center text-green-600">{{ asesor.casos_cerrados }}</td>
+                            <td class="px-3 py-2 text-xs text-center text-emerald-600">{{ asesor.convenios }}</td>
+                            <td class="px-3 py-2 text-xs text-center text-red-600">{{ asesor.demandas }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="px-3 py-6 text-center text-xs text-gray-500">No hay asesores registrados.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Audiencias Semanales -->
+        <div class="bg-white rounded shadow-sm border border-gray-200">
+            <div class="px-4 py-2.5 border-b border-gray-200">
+                <h2 class="text-sm font-semibold text-gray-800 flex items-center gap-1.5"><img src="{% static 'svg/calendar-month-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Audiencias Semanales</h2>
+                <p class="text-xs text-gray-500">{{ inicio_semana|date:"d/m/Y" }} - {{ fin_semana|date:"d/m/Y" }}</p>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expediente</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Asesor</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for aud in audiencias_semanales %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-3 py-2 text-xs font-medium">{{ aud.fecha_audiencia|date:"d/m H:i" }}</td>
+                            <td class="px-3 py-2 text-xs">
+                                <a href="{% url 'expediente_detail' aud.pk %}" class="text-gray-600 hover:text-gray-800">
+                                    {{ aud.numero }}
+                                </a>
+                            </td>
+                            <td class="px-3 py-2 text-xs">{{ aud.cliente.nombre }}</td>
+                            <td class="px-3 py-2 text-xs">{{ aud.asesor.get_full_name|default:aud.asesor.username }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="px-3 py-6 text-center text-xs text-gray-500">No hay audiencias esta semana.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Actions -->
+    <div class="flex space-x-4">
+        <a href="{% url 'exportar_excel' %}"
+           class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-700 transition-colors text-sm font-medium">
+            <img src="{% static 'svg/arrow-down-bold-box-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Exportar a Excel
+        </a>
+    </div>
+</div>
+{% endblock %}

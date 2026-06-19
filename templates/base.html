@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% load static %}
+    <title>{% block title %}Despacho Laboral{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f2f5', 100: '#d6d9de', 200: '#b0b5bd', 300: '#868d98',
+                            400: '#636a75', 500: '#47505e', 600: '#36404f', 700: '#2a3340',
+                            800: '#1e2530', 900: '#141a23',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* ─── Enterprise ERP Design System ─────────────────────────────── */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        /* Border-radius: industrial, not rounded */
+        .rounded-xl, .rounded-2xl, .rounded-lg, .rounded-md {
+            border-radius: 4px !important;
+        }
+        .rounded-full {
+            border-radius: 9999px !important;
+        }
+
+        /* ─── Cards: compact and dense ─────────────────────────────── */
+        .card {
+            background: #fff;
+            border: 1px solid #d4d6d9;
+            border-radius: 4px;
+        }
+        .card-header {
+            padding: 8px 14px;
+            border-bottom: 1px solid #d4d6d9;
+            background: #f5f6f7;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            color: #2a3340;
+        }
+        .card-body {
+            padding: 12px 14px;
+        }
+
+        /* ─── Buttons: industrial ERP style ─────────────────────────── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 5px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            border: 1px solid #b0b5bd;
+            border-radius: 3px;
+            background: #f5f6f7;
+            color: #2a3340;
+            transition: all 0.1s ease;
+            cursor: pointer;
+            line-height: 1.4;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+        .btn:hover {
+            background: #e8eaed;
+            border-color: #868d98;
+        }
+        .btn-primary {
+            background: #36404f;
+            border-color: #2a3340;
+            color: #fff;
+        }
+        .btn-primary:hover {
+            background: #2a3340;
+            border-color: #1e2530;
+        }
+        .btn-success {
+            background: #3d6b4d;
+            border-color: #2d523a;
+            color: #fff;
+        }
+        .btn-success:hover {
+            background: #2d523a;
+        }
+        .btn-danger {
+            background: #8b3a3a;
+            border-color: #6e2d2d;
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background: #6e2d2d;
+        }
+        .btn-sm {
+            padding: 3px 8px;
+            font-size: 11px;
+        }
+
+        /* ─── Tables: compact ──────────────────────────────────────── */
+        table.w-full th {
+            padding: 6px 10px !important;
+            font-size: 10px !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.04em !important;
+            background: #f0f2f5 !important;
+            color: #47505e !important;
+            border-bottom: 2px solid #d4d6d9 !important;
+        }
+        table.w-full td {
+            padding: 6px 10px !important;
+            font-size: 12px !important;
+        }
+        table.w-full tbody tr:hover {
+            background: #f5f7fa !important;
+        }
+        table.w-full tbody tr {
+            border-bottom: 1px solid #e8eaed;
+        }
+
+        /* ─── Form inputs: compact ─────────────────────────────────── */
+        input, select, textarea {
+            border-radius: 3px !important;
+            font-size: 12px !important;
+            padding: 5px 8px !important;
+            border: 1px solid #b0b5bd !important;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: #47505e !important;
+            box-shadow: 0 0 0 1px #47505e !important;
+            outline: none !important;
+        }
+
+        /* ─── Status badges ────────────────────────────────────────── */
+        .badge {
+            display: inline-block;
+            padding: 2px 7px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        /* ─── Global overrides for spacing ─────────────────────────── */
+        .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+            --tw-space-y-reverse: 0;
+            margin-top: calc(0.75rem * calc(1 - var(--tw-space-y-reverse)));
+            margin-bottom: calc(0.75rem * var(--tw-space-y-reverse));
+        }
+        .gap-6 {
+            gap: 0.75rem !important;
+        }
+        .gap-4 {
+            gap: 0.5rem !important;
+        }
+
+        /* ─── Override specific padding patterns ───────────────────── */
+        .px-6 {
+            padding-left: 14px !important;
+            padding-right: 14px !important;
+        }
+        .py-4:where(:not(nav *)) {
+            padding-top: 8px !important;
+            padding-bottom: 8px !important;
+        }
+        .p-6:where(.bg-white) {
+            padding: 12px 14px !important;
+        }
+        .p-4:where(.bg-white) {
+            padding: 10px 12px !important;
+        }
+        .p-8 {
+            padding: 16px !important;
+        }
+
+        /* ─── Responsive table scroll ──────────────────────────────── */
+        .overflow-x-auto {
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* ─── Pagination compact ───────────────────────────────────── */
+        .px-3\\.py-1 {
+            padding: 2px 8px !important;
+        }
+
+        /* ─── Auth pages ───────────────────────────────────────────── */
+        .auth-bg {
+            background: #1e2530;
+        }
+
+        /* ─── SVG icon dark blue filter ────────────────────────────── */
+        .icon-darkblue {
+            filter: brightness(0) saturate(100%) invert(8%) sepia(50%) saturate(2716%) hue-rotate(198deg) brightness(93%) contrast(104%);
+        }
+
+        /* ─── Nav link separator: remove trailing border from last link ── */
+        .nav-link:last-child {
+            border-right: none !important;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════════
+           APPLE-STYLE NAVIGATION MENU
+           ═══════════════════════════════════════════════════════════════════ */
+        #appleNav {
+            margin: 0;
+            list-style: none;
+            font-family: "Lucida Sans Unicode", "Lucida Grande", Verdana, Arial, Helvetica, sans-serif;
+            letter-spacing: -0.5px;
+            font-size: 13px;
+            text-shadow: 0 -1px 3px #202020;
+            width: 100%;
+            height: 34px;
+            -moz-border-radius: 4px;
+            -webkit-border-radius: 4px;
+            border-radius: 4px;
+            -moz-box-shadow: 0px 3px 3px #cecece;
+            -webkit-box-shadow: 0px 3px 3px #cecece;
+            box-shadow: 0 3px 4px #8b8b8b;
+            display: flex;
+            overflow: hidden;
+        }
+
+        #appleNav li {
+            display: block;
+            float: left;
+            border-right: 1px solid #5d5d5d;
+            border-left: 1px solid #929292;
+            border-bottom: 1px solid #575757;
+            border-top: 1px solid #797979;
+            background-image: -webkit-gradient(linear, left bottom, left top, color-stop(0, #787878), color-stop(0.5, #5E5E5E), color-stop(0.51, #707070), color-stop(1, #838383));
+            background-image: -moz-linear-gradient(center bottom, #787878 0%, #5E5E5E 50%, #707070 51%, #838383 100%);
+            background-color: #5f5f5f;
+            flex: 1 1 auto;
+            text-align: center;
+        }
+
+        #appleNav li:not(:last-child):hover {
+            background-image: -webkit-gradient(linear, left bottom, left top, color-stop(0, #3F3F3F), color-stop(0.5, #383838), color-stop(0.51, #434343), color-stop(1, #555555));
+            background-image: -moz-linear-gradient(center bottom, #3F3F3F 0%, #383838 50%, #434343 51%, #555555 100%);
+            background-color: #383838;
+            -moz-box-shadow: inset 0 0 5px 5px #535353;
+            -webkit-box-shadow: inset 0 0 5px 5px #535353;
+            box-shadow: inset 0 0 5px 5px #535353;
+        }
+
+        #appleNav li:not(:last-child):active {
+            background-image: -webkit-gradient(linear, left bottom, left top, color-stop(0, #3F3F3F), color-stop(0.5, #383838), color-stop(0.51, #434343), color-stop(1, #555555));
+            background-image: -moz-linear-gradient(center bottom, #3F3F3F 0%, #383838 50%, #434343 51%, #555555 100%);
+            background-color: #383838;
+            -moz-box-shadow: inset 0 1px 2px 2px #000;
+            -webkit-box-shadow: inset 0 1px 2px 2px #000;
+            box-shadow: inset 0 1px 2px 2px #000;
+        }
+
+        #appleNav li a {
+            color: white;
+            text-decoration: none;
+            text-align: center;
+            display: block;
+            line-height: 34px;
+            outline: none;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+            padding: 0 10px;
+        }
+
+        #appleNav li a img.logo-nav {
+            vertical-align: middle;
+            margin-top: -2px;
+            height: 22px;
+            width: auto;
+        }
+
+        #appleNav li:first-child {
+            -moz-border-radius: 4px 0 0 4px;
+            -webkit-border-radius: 4px 0 0 4px;
+            border-radius: 4px 0 0 4px;
+            border-left: none;
+            flex: 0 0 auto;
+            min-width: 120px;
+        }
+
+        #appleNav li:last-child {
+            -moz-border-radius: 0 4px 4px 0;
+            -webkit-border-radius: 0 4px 4px 0;
+            border-radius: 0 4px 4px 0;
+            border-right: none;
+            flex: 0 0 auto;
+            min-width: 160px;
+        }
+
+        /* Active/highlighted nav item */
+        #appleNav li.active {
+            background-image: -webkit-gradient(linear, left bottom, left top, color-stop(0, #3F3F3F), color-stop(0.5, #383838), color-stop(0.51, #434343), color-stop(1, #555555));
+            background-image: -moz-linear-gradient(center bottom, #3F3F3F 0%, #383838 50%, #434343 51%, #555555 100%);
+            background-color: #383838;
+            -moz-box-shadow: inset 0 1px 2px 2px #000;
+            -webkit-box-shadow: inset 0 1px 2px 2px #000;
+            box-shadow: inset 0 1px 2px 2px #000;
+        }
+
+        /* Search field inside the last li */
+        #appleNav li.apple-search {
+            min-width: 140px;
+        }
+        #appleNav li.apple-search a {
+            padding: 0 8px;
+        }
+        #appleNav li.apple-search a i {
+            vertical-align: middle;
+        }
+
+        /* Fade in animation */
+        @-webkit-keyframes showMenu {
+            from { opacity: 0; top: -20px; }
+            to   { opacity: 1; }
+        }
+        #appleNav {
+            -webkit-animation: showMenu 0.8s ease-out;
+            position: relative;
+        }
+
+        /* Responsive: stack nav items on small screens */
+        @media (max-width: 768px) {
+            #appleNav {
+                flex-wrap: wrap;
+                height: auto;
+                border-radius: 4px;
+                overflow: hidden;
+            }
+            #appleNav li {
+                flex: 1 1 33%;
+                min-width: 80px;
+                font-size: 10px;
+            }
+            #appleNav li a {
+                font-size: 10px;
+                padding: 0 5px;
+            }
+            #appleNav li:first-child {
+                min-width: 100%;
+                flex: 1 1 100%;
+                border-radius: 4px 4px 0 0;
+            }
+            #appleNav li:last-child {
+                border-radius: 0 0 4px 4px;
+                min-width: 100%;
+            }
+            #appleNav li.apple-search a i {
+                font-size: 12px;
+            }
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="h-full bg-gray-50">
+    {% if user.is_authenticated %}
+    <!-- User info bar (compact strip above Apple nav) -->
+    <div class="flex justify-end items-center" style="background: #1e2530; padding: 3px 16px;">
+        <!-- Búsqueda Global -->
+        <a href="{% url 'busqueda_global' %}?q="
+           class="flex items-center justify-center text-gray-400 hover:text-white transition-colors px-2 py-0.5"
+           style="font-size: 11px;"
+           title="Búsqueda Global">
+            <i class="fas fa-search" style="font-size: 10px;"></i>
+        </a>
+
+        <!-- Campanita de Notificaciones -->
+        <div class="relative ml-2" id="notificaciones-container">
+            <button onclick="toggleNotificaciones()"
+                    class="relative flex items-center justify-center text-gray-400 hover:text-white transition-colors px-2 py-0.5 cursor-pointer"
+                    style="font-size: 11px; background: none; border: none;"
+                    title="Notificaciones">
+                <i class="fas fa-bell" style="font-size: 10px;"></i>
+                {% if notificaciones_no_leidas > 0 %}
+                <span class="absolute -top-1 -right-0 w-3.5 h-3.5 flex items-center justify-center text-[7px] font-bold text-white"
+                      style="background: #ef4444; border-radius: 50%; min-width: 12px; height: 12px;">
+                    {{ notificaciones_no_leidas }}
+                </span>
+                {% endif %}
+            </button>
+            <!-- Dropdown -->
+            <div id="notificaciones-dropdown"
+                 class="absolute right-0 top-full mt-1 w-80 bg-white shadow-lg border border-gray-200 hidden z-50"
+                 style="border-radius: 4px;">
+                <div class="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
+                    <span class="text-xs font-bold text-gray-700 uppercase tracking-wider">Notificaciones</span>
+                    {% if notificaciones_no_leidas > 0 %}
+                    <button onclick="marcarTodasLeidas()"
+                            class="text-[10px] text-blue-600 hover:text-blue-800 font-medium">
+                        Marcar todas leídas
+                    </button>
+                    {% endif %}
+                </div>
+                <div class="max-h-72 overflow-y-auto">
+                    {% if notificaciones %}
+                    {% for n in notificaciones %}
+                    <a href="{{ n.link|default:'#' }}"
+                       class="block px-3 py-2.5 border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                       onclick="{% if not n.leida %}marcarLeida({{ n.pk }});{% endif %}">
+                        <div class="flex items-start gap-2">
+                            <span class="flex-shrink-0 mt-0.5">
+                                {% if not n.leida %}
+                                <span class="w-2 h-2 bg-blue-500 rounded-full inline-block"></span>
+                                {% endif %}
+                            </span>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-xs font-medium {% if not n.leida %}text-gray-800{% else %}text-gray-500{% endif %}">
+                                    {{ n.titulo }}
+                                </p>
+                                {% if n.mensaje %}
+                                <p class="text-[10px] text-gray-500 mt-0.5 line-clamp-2">{{ n.mensaje|truncatechars:80 }}</p>
+                                {% endif %}
+                                <p class="text-[9px] text-gray-400 mt-0.5">{{ n.created_at|date:"d/m/Y H:i" }}</p>
+                            </div>
+                            <span class="text-[10px] flex-shrink-0">{{ n.get_tipo_display }}</span>
+                        </div>
+                    </a>
+                    {% endfor %}
+                    {% else %}
+                    <div class="px-3 py-6 text-center">
+                        <div class="text-2xl mb-1">🔔</div>
+                        <p class="text-xs text-gray-400">No hay notificaciones</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <span class="flex items-center gap-1 ml-2" style="font-size: 11px; color: #9ca3af;">
+            <span style="color: #d1d5db;">{{ user.get_full_name|default:user.username }}</span>
+            <span style="padding: 0 4px; font-size: 9px; font-weight: 600; background: #374151; color: #93c5fd; border-radius: 2px;">
+                {{ user.profile.get_rol_display }}
+            </span>
+        </span>
+
+        <a href="{% url 'password_reset' %}"
+           class="flex items-center justify-center text-gray-400 hover:text-white transition-colors px-2 py-0.5 ml-1"
+           style="font-size: 11px;"
+           title="Cambiar contraseña">
+            <i class="fas fa-key" style="font-size: 10px;"></i>
+        </a>
+
+        <form method="post" action="{% url 'logout' %}" class="inline ml-1">
+            {% csrf_token %}
+            <button type="submit"
+                    class="text-gray-400 hover:text-red-400 hover:bg-red-900/20 transition-colors px-2 py-0.5 cursor-pointer"
+                    style="font-size: 11px; background: none; border: none;">
+                Salir
+            </button>
+        </form>
+    </div>
+
+    <!-- Apple-style Navigation Menu -->
+    <div class="max-w-7xl mx-auto px-3" style="padding-top: 8px; padding-bottom: 8px;">
+        <ul id="appleNav">
+            <li>
+                <a href="{% url 'dashboard_redirect' %}">
+                    <img src="{% static 'img/logo.png' %}" alt="Despacho Laboral" class="logo-nav">
+                </a>
+            </li>
+            <li class="{% if request.resolver_match.url_name == 'expediente_list' %}active{% endif %}">
+                <a href="{% url 'expediente_list' %}">Expedientes</a>
+            </li>
+            <li class="{% if request.resolver_match.url_name == 'cliente_list' %}active{% endif %}">
+                <a href="{% url 'cliente_list' %}">Clientes</a>
+            </li>
+            <li class="{% if request.resolver_match.url_name == 'calendario_audiencias' %}active{% endif %}">
+                <a href="{% url 'calendario_audiencias' %}">Calendario</a>
+            </li>
+            {% if user.profile.rol == 'asesor' %}
+            <li class="{% if request.resolver_match.url_name == 'dashboard_asesor' %}active{% endif %}">
+                <a href="{% url 'dashboard_asesor' %}">Mi Dashboard</a>
+            </li>
+            {% elif user.profile.rol == 'admin' or user.profile.rol == 'superadmin' %}
+            <li class="{% if request.resolver_match.url_name == 'dashboard_admin' %}active{% endif %}">
+                <a href="{% url 'dashboard_admin' %}">Dashboard</a>
+            </li>
+            <li class="{% if request.resolver_match.url_name == 'reportes_admin' %}active{% endif %}">
+                <a href="{% url 'reportes_admin' %}">Reportes</a>
+            </li>
+            <li class="{% if request.resolver_match.url_name == 'exportar_excel' %}active{% endif %}">
+                <a href="{% url 'exportar_excel' %}">Exportar</a>
+            </li>
+            {% endif %}
+            {% if user.profile.rol == 'admin' or user.profile.rol == 'superadmin' or user.profile.rol == 'finanzas' %}
+            <li class="{% if request.resolver_match.url_name == 'dashboard_financiero' %}active{% endif %}">
+                <a href="{% url 'dashboard_financiero' %}">Finanzas</a>
+            </li>
+            <li class="{% if request.resolver_match.url_name|slice:':14' == 'cashmovement' %}active{% endif %}">
+                <a href="{% url 'cashmovement_list' %}">Caja</a>
+            </li>
+            {% endif %}
+            {% if user.profile.rol == 'superadmin' %}
+            <li class="{% if request.resolver_match.url_name == 'superadmin_dashboard' %}active{% endif %}">
+                <a href="{% url 'superadmin_dashboard' %}">Superadmin</a>
+            </li>
+            {% endif %}
+            {% if user.profile.rol == 'superadmin' or user.is_staff %}
+            <li>
+                <a href="{% url 'admin:index' %}">Admin</a>
+            </li>
+            {% endif %}
+            <!-- Search item (last) -->
+            <li class="apple-search">
+                <a href="{% url 'busqueda_global' %}?q=">
+                    <i class="fas fa-search" style="font-size: 11px; margin-right: 4px;"></i> Buscar
+                </a>
+            </li>
+        </ul>
+    </div>
+    {% endif %}
+
+    {% if messages %}
+    <div class="max-w-7xl mx-auto px-4 mt-2">
+        {% for message in messages %}
+        <div class="px-4 py-2 text-sm {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% elif message.tags == 'success' %}bg-green-50 text-green-700 border border-green-200{% else %}bg-blue-50 text-blue-700 border border-blue-200{% endif %}" style="border-radius: 3px;">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <main class="max-w-7xl mx-auto px-3 py-3">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+    function toggleNotificaciones() {
+        const dropdown = document.getElementById('notificaciones-dropdown');
+        dropdown.classList.toggle('hidden');
+    }
+
+    function marcarLeida(pk) {
+        fetch('/notificaciones/' + pk + '/leer/', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
+            .then(() => window.location.reload());
+    }
+
+    function marcarTodasLeidas() {
+        fetch('/notificaciones/leer-todas/', { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
+            .then(() => window.location.reload());
+    }
+
+    // Cerrar dropdown al hacer clic fuera
+    document.addEventListener('click', function(e) {
+        const container = document.getElementById('notificaciones-container');
+        if (container && !container.contains(e.target)) {
+            const dropdown = document.getElementById('notificaciones-dropdown');
+            if (dropdown) dropdown.classList.add('hidden');
+        }
+    });
+    </script>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

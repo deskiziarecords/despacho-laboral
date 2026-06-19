@@ -1,0 +1,272 @@
+{% extends 'base.html' %}
+{% load static custom_filters %}
+{% block title %}Dashboard Administrativo - Despacho Laboral{% endblock %}
+
+{% block content %}
+<div class="space-y-3">
+    <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+        <img src="{% static 'svg/monitor-dashboard.svg' %}" class="w-5 h-5 icon-darkblue">
+        Dashboard Administrativo
+    </h1>
+
+    <!-- Avisos y Pendientes -->
+    {% if avisos %}
+    <div class="card">
+        <div class="card-header flex items-center justify-between">
+            <span class="flex items-center gap-1.5"><img src="{% static 'svg/alert-box-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Avisos y Pendientes de la Semana</span>
+            <a href="/admin/expedientes/aviso/add/" target="_blank" class="text-xs font-normal text-blue-600 hover:text-blue-800 normal-case">+ Nuevo aviso</a>
+        </div>
+        <div class="card-body space-y-2">
+            {% for aviso in avisos %}
+            <div class="px-4 py-3 rounded-lg border
+                {% if aviso.prioridad == 'alta' %}bg-red-50 border-red-200
+                {% elif aviso.prioridad == 'media' %}bg-amber-50 border-amber-200
+                {% else %}bg-green-50 border-green-200{% endif %}">
+                <div class="flex items-start gap-3">
+                    <span class="text-lg flex-shrink-0 mt-0.5">
+                        {% if aviso.prioridad == 'alta' %}🔴{% elif aviso.prioridad == 'media' %}🟡{% else %}🟢{% endif %}
+                    </span>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between gap-2">
+                            <h3 class="text-sm font-semibold text-gray-800">{{ aviso.titulo }}</h3>
+                            <span class="text-[10px] text-gray-400 flex-shrink-0">{{ aviso.created_at|date:"d/m/Y" }}</span>
+                        </div>
+                        {% if aviso.contenido %}
+                        <p class="text-xs text-gray-600 mt-1">{{ aviso.contenido|linebreaksbr }}</p>
+                        {% endif %}
+                        <p class="text-[10px] text-gray-400 mt-1">Por: {{ aviso.creado_por.get_full_name|default:aviso.creado_por.username }}</p>
+                    </div>
+                    <a href="/admin/expedientes/aviso/{{ aviso.pk }}/change/" target="_blank"
+                       class="text-xs text-gray-400 hover:text-gray-600 flex-shrink-0">✏️</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Transferencias Pendientes -->
+    {% if transferencias_pendientes %}
+    <div class="card" style="border-color: #8b3a3a;">
+        <div class="card-header flex items-center justify-between" style="background: #8b3a3a; color: white; border-bottom: none;">
+            <div class="flex items-center space-x-2">
+                <span class="flex items-center gap-1.5"><img src="{% static 'svg/bell-check-outline.svg' %}" class="w-4 h-4" style="filter: brightness(0) invert(1);"> Transferencias Pendientes</span>
+                <span class="badge" style="background:#eab308; color:#854d0e;">{{ transferencias_pendientes|length }}</span>
+            </div>
+            <a href="{% url 'gestionar_transferencias' %}" class="text-xs font-normal text-white/80 hover:text-white normal-case">Gestionar →</a>
+        </div>
+        <div class="card-body space-y-2">
+            {% for sol in transferencias_pendientes %}
+            <div class="flex items-start justify-between px-3 py-2 bg-red-50 border border-red-200" style="border-radius: 3px;">
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm font-medium text-gray-800">{{ sol.expediente.numero }}</span>
+                        <span class="text-sm text-gray-600">— {{ sol.expediente.cliente.nombre }}</span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-0.5">
+                        Solicitado por <strong>{{ sol.solicitante.get_full_name|default:sol.solicitante.username }}</strong>
+                        · {{ sol.created_at|date:"d/m/Y H:i" }}
+                    </p>
+                    <p class="text-xs text-gray-600 mt-1" style="background: #fff; padding: 3px 6px; display: inline-block; border-radius: 2px;">
+                        “{{ sol.motivo|truncatechars:80 }}”
+                    </p>
+                </div>
+                <a href="{% url 'gestionar_transferencias' %}"
+                   class="flex-shrink-0 px-3 py-1 text-xs font-medium text-white rounded"
+                   style="background: #8b3a3a;">
+                    Reasignar
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Total Casos</div>
+            <div class="text-xl font-bold text-gray-800">{{ total_casos }}</div>
+        </div>
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Casos Activos</div>
+            <div class="text-xl font-bold text-gray-800">{{ casos_activos }}</div>
+        </div>
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Convenios</div>
+            <div class="text-xl font-bold text-gray-800">{{ convenios_count }}</div>
+        </div>
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Demandas</div>
+            <div class="text-xl font-bold text-gray-800">{{ demandas_count }}</div>
+        </div>
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Total Reclamado</div>
+            <div class="text-lg font-bold text-gray-800">${{ total_reclamado|floatformat:0|intcomma }}</div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <!-- Casos por Estado -->
+        <div class="card">
+            <div class="card-header flex items-center gap-1.5"><img src="{% static 'svg/monitor-dashboard.svg' %}" class="w-4 h-4 icon-darkblue"> Casos por Estado</div>
+            <div class="card-body">
+                <div class="space-y-1.5">
+                    {% for estado, count in casos_por_estado.items %}
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="flex items-center gap-1.5">
+                            {% if 'Convenio' in estado %}
+                            <img src="{% static 'svg/convenio.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% elif 'Demanda' in estado %}
+                            <img src="{% static 'svg/demanda.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% elif 'Reprogramaci' in estado %}
+                            <img src="{% static 'svg/reprogramacion.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% elif 'Nuevo' in estado %}
+                            <img src="{% static 'svg/file-document-multiple-outline.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% elif 'Citatorio' in estado %}
+                            <img src="{% static 'svg/citatorio.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% elif 'Solicitud' in estado %}
+                            <img src="{% static 'svg/file-edit-outline.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% elif 'Audiencia' in estado %}
+                            <img src="{% static 'svg/audiencia.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% elif 'No notificado' in estado or 'Sin conciliaci' in estado %}
+                            <img src="{% static 'svg/alert-box-outline.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% elif 'Cerrado' in estado %}
+                            <img src="{% static 'svg/check.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% else %}
+                            <img src="{% static 'svg/monitor-dashboard.svg' %}" class="w-3.5 h-3.5 icon-darkblue flex-shrink-0">
+                            {% endif %}
+                            {{ estado }}
+                        </span>
+                        <div class="flex items-center space-x-2">
+                            <div class="w-32 bg-gray-200" style="height: 8px; border-radius: 2px;">
+                                <div class="h-full" style="width: {{ count|floatformat:0 }}%; border-radius: 2px;
+                                    {% if 'Nuevo' in estado %}background:#47505e
+                                    {% elif 'Solicitud' in estado %}background:#636a75
+                                    {% elif 'Audiencia' in estado %}background:#868d98
+                                    {% elif 'Convenio' in estado %}background:#3d6b4d
+                                    {% elif 'Demanda' in estado %}background:#8b3a3a
+                                    {% else %}background:#b0b5bd{% endif %}">
+                                </div>
+                            </div>
+                            <span class="text-xs font-bold text-gray-500 w-6 text-right">{{ count }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Productividad por Asesor -->
+        <div class="card">
+            <div class="card-header flex items-center gap-1.5"><img src="{% static 'svg/account.svg' %}" class="w-4 h-4 icon-darkblue"> Productividad por Asesor</div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr>
+                            <th>Asesor</th>
+                            <th class="text-center">Total</th>
+                            <th class="text-center">Activos</th>
+                            <th class="text-center">Cerrados</th>
+                            <th class="text-center">Conv.</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for asesor in asesores %}
+                        <tr>
+                            <td class="font-medium">{{ asesor.get_full_name|default:asesor.username }}</td>
+                            <td class="text-center">{{ asesor.total_casos }}</td>
+                            <td class="text-center text-gray-700">{{ asesor.casos_activos }}</td>
+                            <td class="text-center text-gray-600">{{ asesor.casos_cerrados }}</td>
+                            <td class="text-center text-gray-700">{{ asesor.convenios|default:'0' }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center text-gray-400 py-6">No hay asesores registrados.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Próximas Audiencias -->
+    <div class="card">
+        <div class="card-header flex items-center justify-between">
+            <span class="flex items-center gap-1.5"><img src="{% static 'svg/calendar-month-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Próximas Audiencias</span>
+            <a href="{% url 'calendario_audiencias' %}" class="text-xs font-normal text-gray-500 hover:text-gray-700 normal-case">Ver calendario →</a>
+        </div>
+        <div class="card-body">
+            {% if proximas_audiencias %}
+            <div class="space-y-1">
+                {% for exp in proximas_audiencias %}
+                <a href="{% url 'expediente_detail' exp.pk %}"
+                   class="block px-3 py-2 bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors" style="border-radius: 3px;">
+                    <div class="flex items-center justify-between text-sm">
+                        <div class="flex items-center space-x-3">
+                            <span class="font-medium text-gray-800">{{ exp.numero }}</span>
+                            <span class="text-gray-500">{{ exp.cliente.nombre }}</span>
+                            <span class="text-xs text-gray-400">({{ exp.asesor.get_full_name|default:exp.asesor.username }})</span>
+                        </div>
+                        <div class="text-xs text-gray-600 font-medium">
+                            {{ exp.fecha_audiencia|date:"d/m/Y H:i" }}
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-400 text-sm py-2">No hay audiencias programadas.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Últimos Movimientos -->
+    <div class="card">
+        <div class="card-header flex items-center gap-1.5"><img src="{% static 'svg/text-box-edit-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Últimos Movimientos</div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr>
+                        <th>Expediente</th>
+                        <th>Usuario</th>
+                        <th>Acción</th>
+                        <th>Detalle</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for mov in ultimos_movimientos %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'expediente_detail' mov.expediente.pk %}" class="text-blue-700 hover:text-blue-900 font-medium">
+                                {{ mov.expediente.numero }}
+                            </a>
+                        </td>
+                        <td>{{ mov.usuario.get_full_name|default:mov.usuario.username }}</td>
+                        <td>
+                            <span class="badge
+                                {% if mov.accion == 'creacion' %}bg-green-100 text-green-700
+                                {% elif mov.accion == 'cambio_estado' %}bg-yellow-100 text-yellow-700
+                                {% elif mov.accion == 'subida_documento' %}bg-blue-100 text-blue-700
+                                {% elif mov.accion == 'nota_agregada' %}bg-purple-100 text-purple-700
+                                {% elif mov.accion == 'resultado_audiencia' %}bg-amber-100 text-amber-700
+                                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                {{ mov.get_accion_display }}
+                            </span>
+                        </td>
+                        <td class="text-gray-500">{{ mov.detalle|truncatechars:50 }}</td>
+                        <td class="text-gray-500">{{ mov.created_at|date:"d/m/Y H:i" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-gray-400 py-6">No hay movimientos registrados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

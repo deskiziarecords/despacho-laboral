@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+{% load custom_filters %}
+{% block title %}Movimientos de Caja - Despacho Laboral{% endblock %}
+
+{% block content %}
+<div class="space-y-3">
+    <!-- Encabezado -->
+    <div class="flex items-center justify-between">
+        <h1 class="text-lg font-bold text-gray-800">💵 Movimientos de Caja</h1>
+        <a href="{% url 'cashmovement_create' %}" class="btn btn-success">
+            + Nuevo movimiento
+        </a>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card">
+        <div class="card-header">🔍 Filtros</div>
+        <div class="card-body">
+            <form method="get" class="flex flex-wrap items-end gap-2">
+                <div>
+                    <label class="text-[10px] text-gray-500 uppercase block mb-0.5">Tipo</label>
+                    <select name="tipo" class="text-xs px-2 py-1 border border-gray-300" style="border-radius: 3px;">
+                        <option value="">Todos</option>
+                        <option value="ingreso" {% if filtros.tipo == 'ingreso' %}selected{% endif %}>💰 Ingresos</option>
+                        <option value="egreso" {% if filtros.tipo == 'egreso' %}selected{% endif %}>💸 Egresos</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[10px] text-gray-500 uppercase block mb-0.5">Oficina</label>
+                    <select name="oficina" class="text-xs px-2 py-1 border border-gray-300" style="border-radius: 3px;">
+                        <option value="">Todas</option>
+                        {% for of in oficinas %}
+                        <option value="{{ of.pk }}" {% if filtros.oficina == of.pk|stringformat:'s' %}selected{% endif %}>{{ of.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[10px] text-gray-500 uppercase block mb-0.5">Categoría</label>
+                    <select name="categoria" class="text-xs px-2 py-1 border border-gray-300" style="border-radius: 3px;">
+                        <option value="">Todas</option>
+                        <optgroup label="Ingresos">
+                            {% for key, label in categorias_ingreso %}
+                            <option value="{{ key }}" {% if filtros.categoria == key %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </optgroup>
+                        <optgroup label="Egresos">
+                            {% for key, label in categorias_egreso %}
+                            <option value="{{ key }}" {% if filtros.categoria == key %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </optgroup>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-[10px] text-gray-500 uppercase block mb-0.5">Desde</label>
+                    <input type="date" name="fecha_desde" value="{{ filtros.fecha_desde }}" class="text-xs px-2 py-1 border border-gray-300" style="border-radius: 3px;">
+                </div>
+                <div>
+                    <label class="text-[10px] text-gray-500 uppercase block mb-0.5">Hasta</label>
+                    <input type="date" name="fecha_hasta" value="{{ filtros.fecha_hasta }}" class="text-xs px-2 py-1 border border-gray-300" style="border-radius: 3px;">
+                </div>
+                <div>
+                    <label class="text-[10px] text-gray-500 uppercase block mb-0.5">Buscar</label>
+                    <input type="text" name="q" value="{{ filtros.q }}" placeholder="Descripción o ref..." class="text-xs px-2 py-1 border border-gray-300" style="border-radius: 3px; width: 160px;">
+                </div>
+                <div class="flex items-center gap-1 pb-0.5">
+                    <button type="submit" class="btn btn-primary btn-sm">Filtrar</button>
+                    {% if filtros %}
+                    <a href="{% url 'cashmovement_list' %}" class="btn btn-sm">✕ Limpiar</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Totales del filtro actual -->
+    <div class="grid grid-cols-3 gap-2">
+        <div class="card p-3" style="border-left: 3px solid #3d6b4d;">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">💰 Ingresos</div>
+            <div class="text-lg font-bold text-green-700">${{ total_ingresos_filtro|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="card p-3" style="border-left: 3px solid #8b3a3a;">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">💸 Egresos</div>
+            <div class="text-lg font-bold text-red-700">${{ total_egresos_filtro|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="card p-3" style="border-left: 3px solid #47505e;">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">📊 Movimientos</div>
+            <div class="text-lg font-bold text-gray-800">{{ total_movimientos }}</div>
+        </div>
+    </div>
+
+    <!-- Tabla de movimientos -->
+    <div class="card">
+        <div class="card-header flex items-center justify-between">
+            <span>📋 Registros</span>
+            <span class="text-[10px] text-gray-400">{% if page_obj %}{{ page_obj.start_index }}–{{ page_obj.end_index }} de {{ page_obj.paginator.count }}{% endif %}</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Oficina</th>
+                        <th>Tipo</th>
+                        <th>Categoría</th>
+                        <th class="text-right">Monto</th>
+                        <th>Descripción</th>
+                        <th>Referencia</th>
+                        <th>Registrado por</th>
+                        <th class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for m in movimientos %}
+                    <tr>
+                        <td class="text-gray-600 whitespace-nowrap">{{ m.fecha|date:"d/m/Y" }}</td>
+                        <td>{{ m.oficina.nombre }}</td>
+                        <td>
+                            <span class="badge {% if m.tipo == 'ingreso' %}bg-green-100 text-green-700{% else %}bg-red-100 text-red-700{% endif %}">
+                                {{ m.get_tipo_display }}
+                            </span>
+                        </td>
+                        <td class="text-gray-600 text-xs">{{ m.get_categoria_display }}</td>
+                        <td class="text-right font-medium whitespace-nowrap {% if m.tipo == 'ingreso' %}text-green-700{% else %}text-red-700{% endif %}">
+                            {% if m.tipo == 'ingreso' %}+{% else %}-{% endif %}${{ m.monto|floatformat:2|intcomma }}
+                        </td>
+                        <td class="text-gray-500 max-w-xs truncate text-xs">{{ m.descripcion|truncatechars:50 }}</td>
+                        <td class="text-gray-400 text-xs">{{ m.referencia|default:"—" }}</td>
+                        <td class="text-gray-500 text-xs">{{ m.registrado_por.get_full_name|default:m.registrado_por.username }}</td>
+                        <td class="text-center whitespace-nowrap">
+                            <a href="{% url 'cashmovement_update' m.pk %}" class="btn btn-sm" title="Editar">✏️</a>
+                            <a href="{% url 'cashmovement_delete' m.pk %}" class="btn btn-sm btn-danger" title="Eliminar">🗑️</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center text-gray-400 py-8">
+                            <div class="text-3xl mb-2">📭</div>
+                            No hay movimientos registrados.
+                            <a href="{% url 'cashmovement_create' %}" class="text-blue-600 hover:text-blue-800 font-medium">Crear el primero</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Paginación -->
+    {% if page_obj and page_obj.paginator.num_pages > 1 %}
+    <div class="flex items-center justify-between">
+        <span class="text-xs text-gray-500">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+        <div class="flex gap-1">
+            {% if page_obj.has_previous %}
+            <a href="?{% for k,v in filtros.items %}{{ k }}={{ v }}&{% endfor %}page=1" class="btn btn-sm">««</a>
+            <a href="?{% for k,v in filtros.items %}{{ k }}={{ v }}&{% endfor %}page={{ page_obj.previous_page_number }}" class="btn btn-sm">«</a>
+            {% endif %}
+            {% for num in page_obj.paginator.page_range %}
+                {% if num >= page_obj.number|add:'-3' and num <= page_obj.number|add:'3' %}
+                <a href="?{% for k,v in filtros.items %}{{ k }}={{ v }}&{% endfor %}page={{ num }}"
+                   class="btn btn-sm {% if num == page_obj.number %}btn-primary{% endif %}">{{ num }}</a>
+                {% endif %}
+            {% endfor %}
+            {% if page_obj.has_next %}
+            <a href="?{% for k,v in filtros.items %}{{ k }}={{ v }}&{% endfor %}page={{ page_obj.next_page_number }}" class="btn btn-sm">»</a>
+            <a href="?{% for k,v in filtros.items %}{{ k }}={{ v }}&{% endfor %}page={{ page_obj.paginator.num_pages }}" class="btn btn-sm">»»</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

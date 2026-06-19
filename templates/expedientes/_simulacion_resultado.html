@@ -1,0 +1,53 @@
+{% load humanize %}
+
+{% if resultado %}
+    {% if resultado.success %}
+    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+        <h4 class="font-bold text-green-900 text-sm mb-2">📊 Resultado de la Simulación</h4>
+        <dl class="space-y-1.5 text-sm">
+            <div class="flex justify-between">
+                <dt class="text-green-700">Salario diario:</dt>
+                <dd class="font-semibold text-green-900">${{ resultado.salario_diario|floatformat:2|intcomma }}</dd>
+            </div>
+            <div class="flex justify-between">
+                <dt class="text-green-700">Días trabajados:</dt>
+                <dd class="font-semibold text-green-900">{{ resultado.dias_trabajados|intcomma }} días</dd>
+            </div>
+            <div class="flex justify-between">
+                <dt class="text-green-700">Antigüedad:</dt>
+                <dd class="font-semibold text-green-900">{{ resultado.años_trabajados|floatformat:2 }} años</dd>
+            </div>
+            <hr class="border-green-200 my-1.5">
+            <div class="flex justify-between">
+                <dt class="text-green-700">🎄 Aguinaldo:</dt>
+                <dd class="font-medium text-green-800">${{ resultado.desglose.aguinaldo|floatformat:2|intcomma }}</dd>
+            </div>
+            <div class="flex justify-between">
+                <dt class="text-green-700">🏖️ Vacaciones:</dt>
+                <dd class="font-medium text-green-800">${{ resultado.desglose.vacaciones|floatformat:2|intcomma }}</dd>
+            </div>
+            <div class="flex justify-between">
+                <dt class="text-green-700">✈️ Prima vacacional:</dt>
+                <dd class="font-medium text-green-800">${{ resultado.desglose.prima_vacacional|floatformat:2|intcomma }}</dd>
+            </div>
+            <div class="flex justify-between">
+                <dt class="text-green-700">📜 Prima antigüedad:</dt>
+                <dd class="font-medium text-green-800">${{ resultado.desglose.prima_antiguedad|floatformat:2|intcomma }}</dd>
+            </div>
+            <div class="flex justify-between">
+                <dt class="text-green-700">⚖️ Indemnización:</dt>
+                <dd class="font-medium text-green-800">${{ resultado.desglose.indemnizacion|floatformat:2|intcomma }}</dd>
+            </div>
+            <hr class="border-green-300 my-1.5">
+            <div class="flex justify-between text-base">
+                <dt class="font-bold text-green-900">TOTAL:</dt>
+                <dd class="font-extrabold text-green-900 text-lg">${{ resultado.total|floatformat:2|intcomma }}</dd>
+            </div>
+        </dl>
+    </div>
+    {% else %}
+    <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+        <p class="text-red-700 text-sm">❌ {{ resultado.error }}</p>
+    </div>
+    {% endif %}
+{% endif %}

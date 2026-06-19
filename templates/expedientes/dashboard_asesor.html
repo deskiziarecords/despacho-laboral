@@ -1,0 +1,188 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Mi Dashboard - Despacho Laboral{% endblock %}
+
+{% block content %}
+<div class="space-y-3">
+    <h1 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+        <img src="{% static 'svg/monitor-dashboard.svg' %}" class="w-5 h-5 icon-darkblue">
+        Mi Dashboard
+    </h1>
+
+    <!-- Avisos y Pendientes -->
+    {% if avisos %}
+    <div class="card">
+        <div class="card-header flex items-center gap-1.5"><img src="{% static 'svg/alert-box-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Avisos y Pendientes de la Semana</div>
+        <div class="card-body space-y-2">
+            {% for aviso in avisos %}
+            <div class="px-4 py-3 rounded-lg border
+                {% if aviso.prioridad == 'alta' %}bg-red-50 border-red-200
+                {% elif aviso.prioridad == 'media' %}bg-amber-50 border-amber-200
+                {% else %}bg-green-50 border-green-200{% endif %}">
+                <div class="flex items-start gap-3">
+                    <span class="text-lg flex-shrink-0 mt-0.5">
+                        {% if aviso.prioridad == 'alta' %}🔴{% elif aviso.prioridad == 'media' %}🟡{% else %}🟢{% endif %}
+                    </span>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between gap-2">
+                            <h3 class="text-sm font-semibold text-gray-800">{{ aviso.titulo }}</h3>
+                            <span class="text-[10px] text-gray-400 flex-shrink-0">{{ aviso.created_at|date:"d/m/Y" }}</span>
+                        </div>
+                        {% if aviso.contenido %}
+                        <p class="text-xs text-gray-600 mt-1">{{ aviso.contenido|linebreaksbr }}</p>
+                        {% endif %}
+                        <p class="text-[10px] text-gray-400 mt-1">Publicado por: {{ aviso.creado_por.get_full_name|default:aviso.creado_por.username }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Total Casos</div>
+            <div class="text-xl font-bold text-gray-800">{{ total_casos }}</div>
+        </div>
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Casos Activos</div>
+            <div class="text-xl font-bold text-gray-800">{{ casos_activos }}</div>
+        </div>
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Casos Cerrados</div>
+            <div class="text-xl font-bold text-gray-800">{{ casos_cerrados }}</div>
+        </div>
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Pendientes</div>
+            <div class="text-xl font-bold text-gray-800">{{ casos_pendientes }}</div>
+        </div>
+        <div class="card p-3">
+            <div class="text-[10px] text-gray-500 uppercase tracking-wider">Alertas</div>
+            <div class="text-xl font-bold text-red-700">{{ alertas }}</div>
+        </div>
+    </div>
+
+    <!-- Próximas Audiencias -->
+    <div class="card">
+        <div class="card-header flex items-center gap-1.5"><img src="{% static 'svg/calendar-month-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Próximas Audiencias</div>
+        <div class="card-body">
+            {% if proximas_audiencias %}
+            <div class="space-y-1">
+                {% for exp in proximas_audiencias %}
+                <a href="{% url 'expediente_detail' exp.pk %}"
+                   class="block px-3 py-2 bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors text-sm" style="border-radius: 3px;">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="font-medium text-gray-800">{{ exp.numero }}</span>
+                            <span class="text-gray-500 ml-2">{{ exp.cliente.nombre }}</span>
+                        </div>
+                        <div class="text-xs text-gray-600 font-medium">
+                            {{ exp.fecha_audiencia|date:"d/m/Y H:i" }}
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-400 text-sm py-2">No hay audiencias programadas.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Próximas Asesorías Gratuitas -->
+    <div class="card">
+        <div class="card-header flex items-center gap-1.5"><img src="{% static 'svg/message-text-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Próximas Asesorías Gratuitas</div>
+        <div class="card-body">
+            {% if proximas_asesorias %}
+            <div class="space-y-1">
+                {% for c in proximas_asesorias %}
+                <a href="{% url 'cliente_update' c.pk %}"
+                   class="block px-3 py-2 bg-green-50 border border-green-200 hover:bg-green-100 transition-colors text-sm" style="border-radius: 3px;">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span>🎓</span>
+                            <span class="font-medium text-gray-800">{{ c.nombre }}</span>
+                            <span class="text-xs text-gray-500">{{ c.telefono }}</span>
+                        </div>
+                        <div class="text-xs font-medium text-green-700">
+                            {{ c.fecha_asesoria_gratuita|date:"d/m/Y" }}
+                        </div>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p class="text-gray-400 text-sm py-2">No hay asesorías gratuitas agendadas.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Mis Casos Recientes -->
+    <div class="card">
+        <div class="card-header flex items-center justify-between">
+            <span class="flex items-center gap-1.5"><img src="{% static 'svg/file-document-multiple-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Mis Casos Recientes</span>
+            <a href="{% url 'expediente_list' %}" class="text-xs font-normal text-gray-500 hover:text-gray-700 normal-case">Ver todos →</a>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr>
+                        <th>N° Exp</th>
+                        <th>Cliente</th>
+                        <th>Estado</th>
+                        <th>Prioridad</th>
+                        <th>Creado</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for exp in mis_casos %}
+                    <tr>
+                        <td class="font-medium">{{ exp.numero }}</td>
+                        <td>{{ exp.cliente.nombre }}</td>
+                        <td>
+                            <span class="badge
+                                {% if exp.estado == 'nuevo' %}bg-blue-100 text-blue-700
+                                {% elif exp.estado == 'solicitud' %}bg-purple-100 text-purple-700
+                                {% elif exp.estado == 'citatorio' %}bg-indigo-100 text-indigo-700
+                                {% elif exp.estado == 'audiencia' %}bg-yellow-100 text-yellow-700
+                                {% elif exp.estado == 'no_notificado' %}bg-red-100 text-red-700
+                                {% elif exp.estado == 'reprogramacion' %}bg-orange-100 text-orange-700
+                                {% elif exp.estado == 'convenio' %}bg-green-100 text-green-700
+                                {% elif exp.estado == 'sin_conciliacion' %}bg-gray-100 text-gray-700
+                                {% elif exp.estado == 'demanda' %}bg-rose-100 text-rose-700
+                                {% elif exp.estado == 'cerrado' %}bg-slate-100 text-slate-700
+                                {% endif %}">
+                                {{ exp.get_estado_display }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if exp.prioridad == 'alta' %}
+                            <span class="text-xs text-red-600">🔴 Alta</span>
+                            {% elif exp.prioridad == 'baja' %}
+                            <span class="text-xs text-gray-400">⚪ Baja</span>
+                            {% else %}
+                            <span class="text-xs text-yellow-600">🟡 Media</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-gray-500">{{ exp.created_at|date:"d/m/Y" }}</td>
+                        <td>
+                            <a href="{% url 'expediente_detail' exp.pk %}" class="btn btn-sm">Ver</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-gray-400 py-6">
+                            No tienes casos asignados aún.
+                            <a href="{% url 'expediente_create' %}" class="block text-sm text-blue-600 hover:text-blue-800 mt-1">Crear primer caso →</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
