@@ -50,6 +50,8 @@ pillow==12.2.0
     #   weasyprint
 playwright==1.60.0
     # via despacho-laboral
+psycopg2-binary==2.9.12
+    # via despacho-laboral
 pycparser==3.0 ; implementation_name != 'PyPy'
     # via cffi
 pydyf==0.12.1

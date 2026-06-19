@@ -17,7 +17,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # ─── Variables (edita según tu proyecto) ───
-REPO_URL="${REPO_URL:-https://github.com/TU_USUARIO/despacho-laboral.git}"
+REPO_URL="${REPO_URL:-https://github.com/deskiziarecords/despacho-laboral.git}"
 BRANCH="${BRANCH:-main}"
 APP_DIR="/opt/despacho-laboral"
 DOMAIN="${DOMAIN:-}"  # ej: despacho.midominio.com — dejar vacío si solo IP

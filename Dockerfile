@@ -74,17 +74,17 @@ COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Instalar Chromium para Playwright
-RUN playwright install chromium && \
-    playwright install-deps chromium
+RUN playwright install chromium
 
 # Copiar código de la aplicación
 COPY . .
 
 # Recolectar archivos estáticos
-RUN python manage.py collectstatic --noinput --clear 2>/dev/null || true
+RUN python manage.py collectstatic --noinput --clear
 
 # Puerto que usa DO App Platform (8080)
 EXPOSE 8080
 
 # Comando de inicio: Gunicorn
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8080", "--workers", "3", "--timeout", "120"]
+# Entrypoint: migraciones + servidor
+CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8080 --workers 3 --timeout 120"]
