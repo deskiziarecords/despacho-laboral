@@ -28,6 +28,8 @@ DEBUG = env('DEBUG')
 
 ALLOWED_HOSTS = env('ALLOWED_HOSTS')
 
+CSRF_TRUSTED_ORIGINS = env('CSRF_TRUSTED_ORIGINS')
+
 # ─── Railway auto-detection ────────────────────
 # Railway inyecta RAILWAY_PUBLIC_DOMAIN automáticamente
 _RAILWAY_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
