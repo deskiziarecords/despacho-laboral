@@ -85,4 +85,4 @@ RUN uv run python manage.py collectstatic --noinput --clear
 # ================================================
 EXPOSE 8000
 
-CMD ["sh", "-c", "uv run python manage.py migrate --noinput && DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-Admin123!} uv run python manage.py createsuperuser --noinput --username ${DJANGO_SUPERUSER_USERNAME:-admin} --email ${DJANGO_SUPERUSER_EMAIL:-admin@despacho.com} 2>/dev/null || true && uv run gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 3 --timeout 120"
+CMD ["sh", "-c", "uv run python manage.py migrate --noinput && if [ -f data.json ]; then echo 'Cargando datos...' && uv run python manage.py loaddata data.json 2>/dev/null || echo 'Datos ya cargados o error ignorado'; fi && DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-Admin123!} uv run python manage.py createsuperuser --noinput --username ${DJANGO_SUPERUSER_USERNAME:-admin} --email ${DJANGO_SUPERUSER_EMAIL:-admin@despacho.com} 2>/dev/null || true && uv run gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 3 --timeout 120"
