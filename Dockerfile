@@ -4,26 +4,7 @@
 # Incluye: WeasyPrint (PDFs) + Playwright (Chromium)
 # ================================================
 
-# --- Build Stage ---
-FROM python:3.13-slim-bookworm AS builder
-
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1
-
-WORKDIR /app
-
-# Dependencias del sistema para compilar
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# --- Runtime Stage ---
-FROM python:3.13-slim-bookworm AS runtime
+FROM python:3.13-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -31,24 +12,29 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Dependencias del sistema:
-#   - WeasyPrint (Pango, Cairo, GDK-PixBuf)
-#   - Playwright (Chromium)
-#   - PostgreSQL (libpq)
+# ================================================
+# 1. Dependencias del sistema
+#    (WeasyPrint + Playwright + PostgreSQL)
+# ================================================
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    build-essential \
+    # PostgreSQL
+    libpq-dev \
+    libpq5 \
     # WeasyPrint
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
-    libgdk-pixbuf2.0-0 \
+    libgdk-pixbuf-2.0-0 \
     libffi-dev \
     libcairo2 \
     shared-mime-info \
     # Playwright / Chromium
     libnss3 \
     libnspr4 \
-    libatk1.0-0tty \
-    libatk-bridge2.0-0tty \
-    libcups2tty \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
     libdrm2 \
     libdbus-1-3 \
     libxkbcommon0 \
@@ -57,28 +43,45 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxfixes3 \
     libxrandr2 \
     libgbm1 \
-    libasound2tty \
-    # PostgreSQL
-    libpq5 \
-    # Utils
-    curl \
+    libasound2 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiar dependencias de Python desde builder
-COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+# ================================================
+# 2. Instalar uv (gestor de paquetes)
+# ================================================
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Instalar Chromium para Playwright
-RUN playwright install chromium
+# ================================================
+# 3. Instalar dependencias de Python
+#    COPY solo pyproject.toml + uv.lock primero
+#    para aprovechar caché de Docker
+# ================================================
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
 
-# Copiar código de la aplicación
+# ================================================
+# 4. Instalar Chromium para Playwright
+# ================================================
+RUN python -m playwright install chromium
+
+# ================================================
+# 5. Copiar código de la aplicación
+# ================================================
 COPY . .
 
-# Recolectar archivos estáticos (para Whitenoise)
+# ================================================
+# 6. Sincronizar proyecto (rápido, solo instala el proyecto local)
+# ================================================
+RUN uv sync --frozen --no-dev
+
+# ================================================
+# 7. Recolectar archivos estáticos (Whitenoise)
+# ================================================
 RUN python manage.py collectstatic --noinput --clear
 
-# Railway asigna el puerto dinámicamente via $PORT
+# ================================================
+# 8. Configurar puerto y comando de inicio
+# ================================================
 EXPOSE 8000
 
-# Entrypoint: migraciones + servidor Gunicorn
 CMD ["sh", "-c", "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 3 --timeout 120"]
