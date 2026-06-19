@@ -66,9 +66,11 @@ RUN uv sync --frozen --no-dev --no-install-project
 RUN uv run playwright install chromium
 
 # ================================================
-# 5. Copiar código de la aplicación
+# 5. Copiar código de la aplicación y script de inicio
 # ================================================
 COPY . .
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # ================================================
 # 6. Sincronizar proyecto (rápido, solo instala el proyecto local)
@@ -85,4 +87,4 @@ RUN uv run python manage.py collectstatic --noinput --clear
 # ================================================
 EXPOSE 8000
 
-CMD uv run python manage.py migrate --noinput && if [ -f data.json ]; then echo 'Cargando datos...' && uv run python manage.py loaddata data.json || echo 'Datos ya cargados (error ignorado)'; fi && DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-Admin123!} uv run python manage.py createsuperuser --noinput --username ${DJANGO_SUPERUSER_USERNAME:-admin} --email ${DJANGO_SUPERUSER_EMAIL:-admin@despacho.com} 2>/dev/null || true && uv run gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 3 --timeout 120
+ENTRYPOINT ["/entrypoint.sh"]
