@@ -1,0 +1,41 @@
+# Entorno virtual
+.venv/
+venv/
+env/
+
+# Base de datos
+*.sqlite3
+*.db
+
+# Media subida por usuarios
+media/
+!media/.gitkeep
+
+# Archivos de entorno
+.env
+
+# Logs
+*.log
+server.log
+
+# IDE / Sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Tests y capturas
+test_*.py
+*_test.png
+diagnostico_*.png
+test_v2_*.png
+
+# Git
+.git/
+
+# Deploy scripts (no necesarios en Docker)
+deploy/
