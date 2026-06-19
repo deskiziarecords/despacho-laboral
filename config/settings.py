@@ -28,7 +28,15 @@ DEBUG = env('DEBUG')
 
 ALLOWED_HOSTS = env('ALLOWED_HOSTS')
 
-CSRF_TRUSTED_ORIGINS = env('CSRF_TRUSTED_ORIGINS')
+# ─── Railway auto-detection ────────────────────
+# Railway inyecta RAILWAY_PUBLIC_DOMAIN automáticamente
+_RAILWAY_DOMAIN = os.environ.get('RAILWAY_PUBLIC_DOMAIN')
+if _RAILWAY_DOMAIN:
+    if _RAILWAY_DOMAIN not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_RAILWAY_DOMAIN)
+    _railway_origin = f'https://{_RAILWAY_DOMAIN}'
+    if _railway_origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(_railway_origin)
 
 INSTALLED_APPS = [
     'django.contrib.admin',
