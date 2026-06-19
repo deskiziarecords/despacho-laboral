@@ -9,11 +9,11 @@ uv run python manage.py migrate --noinput
 
 # 2. Crear superusuario admin (si no existe)
 echo ">>> Verificando superusuario..."
-DJANGO_SUPERUSER_PASSWORD="${DJANGO_SUPERUSER_PASSWORD:-Admin123!}"
+export DJANGO_SUPERUSER_PASSWORD="${DJANGO_SUPERUSER_PASSWORD:-Admin123!}"
 uv run python manage.py createsuperuser --noinput \
     --username "${DJANGO_SUPERUSER_USERNAME:-admin}" \
     --email "${DJANGO_SUPERUSER_EMAIL:-admin@despacho.com}" \
-    2>/dev/null || true
+    || echo ">>> (Superusuario ya existe u otro error ignorado)"
 
 # 3. Iniciar Gunicorn
 echo ">>> Iniciando Gunicorn en 0.0.0.0:${PORT:-8000}..."
