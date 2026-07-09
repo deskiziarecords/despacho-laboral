@@ -16,4 +16,5 @@ urlpatterns = [
     path('superadmin/', views.SuperadminDashboardView.as_view(), name='superadmin_dashboard'),
     path('superadmin/matriz-permisos/', views.MatrizPermisosView.as_view(), name='matriz_permisos'),
     path('superadmin/matriz-permisos/exportar-excel/', views.exportar_matriz_permisos_excel, name='exportar_matriz_permisos_excel'),
+    path('superadmin/cargar-datos-demo/', views.cargar_datos_demo, name='cargar_datos_demo'),
 ]

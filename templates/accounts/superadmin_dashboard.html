@@ -19,6 +19,9 @@
             <a href="{% url 'exportar_excel' %}" class="btn">
                 <img src="{% static 'svg/arrow-down-bold-box-outline.svg' %}" class="w-3.5 h-3.5 icon-darkblue"> Exportar Excel
             </a>
+            <a href="{% url 'cargar_datos_demo' %}" class="btn {% if total_expedientes == 0 %}btn-primary font-semibold animate-pulse{% endif %}" title="Cargar datos de demostración (clientes, expedientes, usuarios de prueba)">
+                📦 Cargar datos demo
+            </a>
         </div>
     </div>
 

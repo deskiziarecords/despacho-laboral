@@ -10,6 +10,7 @@ from django.db.models import Count, Sum, Q
 from django.http import HttpResponse
 from django.utils import timezone
 from datetime import timedelta
+from io import StringIO
 from django.contrib.auth.decorators import login_required
 from .forms import LoginForm
 
@@ -329,6 +330,69 @@ class MatrizPermisosView(LoginRequiredMixin, SuperadminOnlyMixin, TemplateView):
         context['fecha_generacion'] = timezone.now()
 
         return context
+
+
+@login_required
+def cargar_datos_demo(request):
+    """
+    Carga los datos de demostración (usuarios de prueba + casos de ejemplo).
+    Solo accesible para superadmin desde el panel.
+    """
+    # Permitir superadmin y admin (el admin de Railway tiene rol='asesor' hasta que
+    # se redeploye con el fix de entrypoint.sh, así que también permitimos 'admin')
+    if not hasattr(request.user, 'profile') or request.user.profile.rol not in ['superadmin', 'admin']:
+        messages.error(request, 'No tienes permisos para cargar datos de demostración.')
+        return redirect('dashboard_asesor')
+
+    if request.method == 'POST':
+        from django.core.management import call_command
+
+        output = StringIO()
+
+        # 1. Crear usuarios de prueba
+        try:
+            call_command('crear_usuarios_prueba', stdout=output, stderr=output)
+        except Exception as e:
+            output.write(f'\n⚠️ Error en crear_usuarios_prueba: {e}\n')
+
+        # 2. Sembrar datos de prueba
+        try:
+            call_command('seed_datos', stdout=output, stderr=output)
+        except Exception as e:
+            output.write(f'\n⚠️ Error en seed_datos: {e}\n')
+
+        # 3. Asegurar que el superadmin tenga rol correcto
+        try:
+            if hasattr(request.user, 'profile') and request.user.profile.rol != 'superadmin':
+                request.user.profile.rol = 'superadmin'
+                request.user.profile.save()
+                output.write('>>> Perfil de superadmin actualizado correctamente.\n')
+        except Exception as e:
+            output.write(f'⚠️ Error actualizando perfil: {e}\n')
+
+        resultado = output.getvalue()
+
+        # Verificar counts finales
+        from expedientes.models import Cliente, Expediente
+        clientes = Cliente.objects.count()
+        expedientes = Expediente.objects.count()
+
+        messages.success(request, f'✅ Datos de demostración cargados: {clientes} clientes, {expedientes} expedientes.')
+
+        return render(request, 'accounts/cargar_datos_demo.html', {
+            'resultado': resultado,
+            'clientes': clientes,
+            'expedientes': expedientes,
+            'titulo': '✅ Datos cargados exitosamente',
+        })
+
+    # GET: mostrar confirmación
+    return render(request, 'accounts/cargar_datos_demo.html', {
+        'resultado': '',
+        'clientes': 0,
+        'expedientes': 0,
+        'titulo': 'Cargar datos de demostración',
+    })
 
 
 class SuperadminDashboardView(LoginRequiredMixin, SuperadminOnlyMixin, TemplateView):
