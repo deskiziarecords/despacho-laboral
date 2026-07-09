@@ -15,6 +15,27 @@ uv run python manage.py createsuperuser --noinput \
     --email "${DJANGO_SUPERUSER_EMAIL:-admin@despacho.com}" \
     || echo ">>> (Superusuario ya existe u otro error ignorado)"
 
+# Actualizar el rol del superusuario a superadmin
+# (el signal post_save crea el perfil con rol='asesor' por defecto)
+echo ">>> Actualizando rol del superusuario a superadmin..."
+uv run python manage.py shell -c "
+from django.contrib.auth.models import User
+username = '${DJANGO_SUPERUSER_USERNAME:-admin}'
+try:
+    user = User.objects.get(username=username)
+    if hasattr(user, 'profile'):
+        if user.profile.rol != 'superadmin':
+            user.profile.rol = 'superadmin'
+            user.profile.save()
+            print(f'>>> Perfil de {username} actualizado a superadmin')
+        else:
+            print(f'>>> Perfil de {username} ya es superadmin')
+    else:
+        print(f'>>> Advertencia: {username} no tiene perfil')
+except User.DoesNotExist:
+    print(f'>>> Advertencia: usuario {username} no encontrado')
+" || echo ">>> (Aviso: no se pudo actualizar el rol del superusuario)"
+
 # 3. Resincronizar sequences de PostgreSQL
 # Después de migrar datos desde SQLite, los auto-increment sequences
 # de PostgreSQL pueden quedar desincronizados. Esto previene errores
@@ -38,7 +59,15 @@ else:
     print('>>> No se necesita resincronización.')
 " || echo ">>> (Aviso: no se pudieron resincronizar sequences, ignorando)"
 
-# 4. Iniciar Gunicorn
+# 4. Crear usuarios de prueba (idempotente — omite si ya existen)
+echo ">>> Creando usuarios de prueba..."
+uv run python manage.py crear_usuarios_prueba 2>&1 || echo ">>> (Aviso: no se pudieron crear usuarios de prueba — consulta los logs para más detalles)"
+
+# 5. Sembrar datos de prueba (idempotente — omite si ya existen)
+echo ">>> Sembrando datos de prueba..."
+uv run python manage.py seed_datos 2>&1 || echo ">>> (Aviso: no se pudieron sembrar datos de prueba — consulta los logs para más detalles)"
+
+# 6. Iniciar Gunicorn
 echo ">>> Iniciando Gunicorn en 0.0.0.0:${PORT:-8000}..."
 exec uv run gunicorn config.wsgi:application \
     --bind "0.0.0.0:${PORT:-8000}" \
