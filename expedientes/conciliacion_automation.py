@@ -242,6 +242,32 @@ def _click_validar_continuar(page):
 # ══════════════════════════════════════════════════════════════════════════
 
 
+# ─── Mapeo de valores del modelo a IDs del portal BC ───────────────────
+
+GENERO_PORTAL_IDS = {
+    'masculino': '1',
+    'femenino': '2',
+}
+
+PERIODICIDAD_PORTAL_IDS = {
+    'diario': '1',      # Diario
+    'mensual': '2',      # Mensual
+    'quincenal': '3',    # Quincenal
+    'semanal': '4',      # Semanal
+}
+
+JORNADA_PORTAL_IDS = {
+    'diurna': '1',       # DIURNA
+    'nocturna': '2',     # NOCTURNA
+    'mixta': '3',        # MIXTA
+}
+
+TIPO_PERSONA_PORTAL_IDS = {
+    'fisica': '1',       # Persona Física
+    'moral': '2',        # Persona Moral
+}
+
+
 def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_str):
     """Llena los campos del solicitante (trabajador)."""
     nombre_parts = (cliente.nombre or '').split()
@@ -255,8 +281,9 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
     _fill_input(page, 'solicitante[fecha_nacimiento]', fecha_nac_str)
 
     # Género y nacionalidad
-    _select_option(page, 'solicitante[genero_id]', '1')         # MASCULINO
-    _select_option(page, 'solicitante[nacionalidad_id]', '1')   # MEXICANA
+    genero_id = GENERO_PORTAL_IDS.get(cliente.genero, '1')
+    _select_option(page, 'solicitante[genero_id]', genero_id)
+    _select_option(page, 'solicitante[nacionalidad_id]', '1')   # MEXICANA (siempre)
 
     # Contactos (teléfono) — el sitio usa contactos[1], contactos[2], contactos[3]
     _fill_input(page, 'contactos[1]', cliente.telefono or '6641234567')
@@ -271,13 +298,17 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
     _select_option(page, 'municipio', 'Tijuana')
 
     # Datos laborales
+    periodicidad_id = PERIODICIDAD_PORTAL_IDS.get(cliente.periodo_pago, '2')
+    horas = str(cliente.horas_semanales or 40)
+    jornada_id = JORNADA_PORTAL_IDS.get(cliente.jornada, '1')
+
     _fill_input(page, 'dato_laboral[puesto]', cliente.puesto or 'Trabajador')
     _fill_input(page, 'dato_laboral[remuneracion]', str(float(cliente.salario or 10000)))
-    _select_option(page, 'dato_laboral[periodicidad_id]', '2')     # Mensual
-    _fill_input(page, 'dato_laboral[horas_semanales]', '40')
+    _select_option(page, 'dato_laboral[periodicidad_id]', periodicidad_id)
+    _fill_input(page, 'dato_laboral[horas_semanales]', horas)
     _fill_input(page, 'dato_laboral[fecha_ingreso]', fecha_ing_str)
     _fill_input(page, 'dato_laboral[fecha_salida]', fecha_sal_str)
-    _select_option(page, 'dato_laboral[jornada_id]', '1')          # DIURNA
+    _select_option(page, 'dato_laboral[jornada_id]', jornada_id)
 
     page.wait_for_timeout(1000)
 
@@ -290,8 +321,9 @@ def _llenar_citado(page, cliente):
     empresa_nombre = cliente.empresa_razon_social or cliente.empresa or 'Empresa SA de CV'
     nombre_parts = empresa_nombre.split()
 
-    # Tipo persona: Física (1) o Moral (2)
-    _click_radio(page, 'solicitado[tipo_persona_id]', '1')
+    # Tipo persona: desde el modelo (Física o Moral)
+    tipo_persona_id = TIPO_PERSONA_PORTAL_IDS.get(cliente.tipo_persona_citado, '1')
+    _click_radio(page, 'solicitado[tipo_persona_id]', tipo_persona_id)
     page.wait_for_timeout(500)
 
     # Datos del citado
@@ -349,7 +381,7 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
     # Variables de fechas
     fecha_conflicto = cliente.fecha_salida or expediente.fecha_tramite or date.today()
-    fecha_nac = (cliente.fecha_ingreso or date.today()) - timedelta(days=365 * 30)
+    fecha_nac = cliente.fecha_nacimiento or (cliente.fecha_ingreso or date.today()) - timedelta(days=365 * 30)
     fecha_ing = cliente.fecha_ingreso or date.today().replace(year=date.today().year - 2)
     fecha_sal = cliente.fecha_salida or date.today()
 

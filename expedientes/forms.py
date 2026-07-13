@@ -7,10 +7,13 @@ class ClienteForm(forms.ModelForm):
     class Meta:
         model = Cliente
         fields = ['nombre', 'curp', 'rfc', 'telefono', 'whatsapp', 'email',
+                   'fecha_nacimiento', 'genero',
                    'direccion_calle', 'direccion_numero', 'direccion_cp', 'direccion_colonia',
                    'empresa', 'empresa_actividad', 'empresa_telefono', 'empresa_razon_social',
                    'empresa_calle', 'empresa_numero', 'empresa_colonia', 'empresa_cp', 'empresa_referencias',
-                   'puesto', 'salario', 'fecha_ingreso', 'fecha_salida',
+                   'tipo_persona_citado',
+                   'puesto', 'salario', 'periodo_pago', 'horas_semanales', 'jornada',
+                   'fecha_ingreso', 'fecha_salida',
                    'asesoria_gratuita_ofrecida', 'asesoria_gratuita_agendada', 'fecha_asesoria_gratuita']
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'input', 'placeholder': 'Nombre completo del cliente'}),
@@ -19,6 +22,8 @@ class ClienteForm(forms.ModelForm):
             'telefono': forms.TextInput(attrs={'class': 'input', 'placeholder': '+52 55 1234 5678'}),
             'whatsapp': forms.TextInput(attrs={'class': 'input', 'placeholder': '+52 55 1234 5678'}),
             'email': forms.EmailInput(attrs={'class': 'input', 'placeholder': 'cliente@email.com'}),
+            'fecha_nacimiento': forms.DateInput(attrs={'class': 'input', 'type': 'date'}),
+            'genero': forms.Select(attrs={'class': 'input'}),
             'direccion_calle': forms.TextInput(attrs={'class': 'input', 'placeholder': 'Calle'}),
             'direccion_numero': forms.TextInput(attrs={'class': 'input', 'placeholder': 'Número'}),
             'direccion_cp': forms.TextInput(attrs={'class': 'input', 'placeholder': 'Código Postal'}),
@@ -32,8 +37,12 @@ class ClienteForm(forms.ModelForm):
             'empresa_colonia': forms.TextInput(attrs={'class': 'input', 'placeholder': 'Colonia'}),
             'empresa_cp': forms.TextInput(attrs={'class': 'input', 'placeholder': 'Código Postal'}),
             'empresa_referencias': forms.Textarea(attrs={'class': 'input', 'rows': 2, 'placeholder': 'Referencias cercanas al domicilio'}),
+            'tipo_persona_citado': forms.Select(attrs={'class': 'input'}),
             'puesto': forms.TextInput(attrs={'class': 'input', 'placeholder': 'Puesto del trabajador'}),
             'salario': forms.NumberInput(attrs={'class': 'input'}),
+            'periodo_pago': forms.Select(attrs={'class': 'input'}),
+            'horas_semanales': forms.NumberInput(attrs={'class': 'input', 'placeholder': 'Ej: 40'}),
+            'jornada': forms.Select(attrs={'class': 'input'}),
             'fecha_ingreso': forms.DateInput(attrs={'class': 'input', 'type': 'date'}),
             'fecha_salida': forms.DateInput(attrs={'class': 'input', 'type': 'date'}),
             'asesoria_gratuita_ofrecida': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500'}),

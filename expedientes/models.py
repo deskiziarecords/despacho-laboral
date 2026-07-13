@@ -5,12 +5,39 @@ from django.core.exceptions import ValidationError
 
 
 class Cliente(models.Model):
+    GENERO_CHOICES = [
+        ('masculino', 'Masculino'),
+        ('femenino', 'Femenino'),
+    ]
+
+    PERIODO_PAGO_CHOICES = [
+        ('diario', 'Diario'),
+        ('semanal', 'Semanal'),
+        ('quincenal', 'Quincenal'),
+        ('mensual', 'Mensual'),
+    ]
+
+    JORNADA_CHOICES = [
+        ('diurna', 'Diurna'),
+        ('nocturna', 'Nocturna'),
+        ('mixta', 'Mixta'),
+    ]
+
+    TIPO_PERSONA_CHOICES = [
+        ('fisica', 'Persona Física'),
+        ('moral', 'Persona Moral'),
+    ]
+
     nombre = models.CharField('Nombre completo', max_length=200)
     curp = models.CharField('CURP', max_length=18, unique=True)
     rfc = models.CharField('RFC', max_length=13, blank=True)
     telefono = models.CharField('Teléfono', max_length=15)
     whatsapp = models.CharField('WhatsApp', max_length=15, blank=True)
     email = models.EmailField('Email', blank=True)
+
+    # Datos personales complementarios (para conciliación)
+    fecha_nacimiento = models.DateField('Fecha de nacimiento', null=True, blank=True)
+    genero = models.CharField('Género', max_length=10, choices=GENERO_CHOICES, default='masculino')
 
     # Dirección particular (detallada)
     direccion_calle = models.CharField('Calle', max_length=200, blank=True)
@@ -29,8 +56,20 @@ class Cliente(models.Model):
     empresa_cp = models.CharField('Código Postal (empresa)', max_length=10, blank=True)
     empresa_referencias = models.TextField('Referencias del domicilio', blank=True)
 
+    # Tipo de persona del patrón (para conciliación)
+    tipo_persona_citado = models.CharField('Tipo de persona del patrón', max_length=10,
+                                            choices=TIPO_PERSONA_CHOICES, default='fisica',
+                                            help_text='¿El patrón es persona física o moral?')
+
+    # Datos laborales
     puesto = models.CharField('Puesto', max_length=100, blank=True)
     salario = models.DecimalField('Salario mensual', max_digits=10, decimal_places=2, null=True, blank=True)
+    periodo_pago = models.CharField('Periodo de pago', max_length=10, choices=PERIODO_PAGO_CHOICES,
+                                     default='mensual', help_text='¿Cada cuándo le pagan?')
+    horas_semanales = models.PositiveIntegerField('Horas semanales', null=True, blank=True, default=40,
+                                                    help_text='Horas trabajadas por semana')
+    jornada = models.CharField('Jornada', max_length=10, choices=JORNADA_CHOICES, default='diurna',
+                                help_text='Tipo de jornada laboral')
     fecha_ingreso = models.DateField('Fecha de ingreso', null=True, blank=True)
     fecha_salida = models.DateField('Fecha de salida/despido', null=True, blank=True)
 

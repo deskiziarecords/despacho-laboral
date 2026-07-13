@@ -1,0 +1,119 @@
+http://conciliacionbc.gob.mx/
+
+opcion boton: soy empleado
+
+--nueva pagina--
+seleccionar opcion: Me despidieron sin justificacion
+------sale pop up modal
+seleccionar opcion:  Ya he visto la orientacion, quiero ir directamente a la solicitud de la conciliacion
+--nueva pagina---
+1.- sale pop up aviso de privacidad
+2.- ir hasta la parte inferior y seleccionar si acepto del checkbox
+3.- Presionar boton: Aceptar
+---nuevo modal pop up--
+Presionar boton :  Continuar Leyendo
+---nuevo modal pop up--
+Presionar boton :  Continuar Leyendo
+---nuevo modal pop up--
+Presionar boton :  Ir a cuestionarios
+
+--Pagina Solicitud de Trabajador---
+cuestionario: La actividad de el patron es?
+A)seleccionar ultima opcion de el checkbox: Ninguna de las anteriores
+B)Presionar boton: Continuar
+
+--Datos de la Solicitud
+A)Llenar campo fecha del Conflicto: agregar la fecha de el despido:  Dia/Mes/año    ejemplo: 07/01/2026
+B)campo dropdown: Objeto de la solicitud.    Seleccionar pirmera opcion: Despido
+C) Presionar boton: Validar y Continuar
+
+----Nueva Pagina---
+A) presionar boton: Agregar Solicitante
+-- seguido Datos de identificacion--
+LLenar los campos:
+1.- CURP del solicitante
+2.- Nombre del solicitante
+3.-Primer Apellido
+4.-Segundo Apellido
+5.- Fecha de nacimiento con el siguiente formato: dia/mes/año  ejemplo: 02/12/1980
+6.-Seleccionar Genero: Masculino o Femenino
+7.-Seleccionar Nacionalidad: MEXICANA
+8.- Seleccionar Estado de nacimiento
+--Contacto--
+Agregar en Campo: 
+Telefono celular-  Ejemplo:6633155124
+--Domicilio--
+LLenar campos
+a)Estado
+b)Calle
+c)Nombre de vialidad
+d)Numero exterior
+e)Colonia
+f)Municipio o alcaldia
+g)codigo costal
+--Datos Laborales--
+LLenar campos:
+a)Puesto
+b)Cuanto te pagan
+c)Cada cuando de pagan: dropdown menu opciones: Semanal, Mensual, Quincenal, Diario
+d)Horas Semanales
+e)fecha de ingreso: Formato dia/mes/año ejemplo: 10/01/2026
+f)fecha de Salida: Formato dia/mes/año ejemplo: 20/05/2026
+g)Jornada- Seleccionar opcion de el dropdown: DIURNA, NOCTURNA o MIXTA
+--
+presionar boton:
+Guardar solicitante--
+presionar boton:
+Validar y Continuar
+
+----Datos del citado---
+seleccionar checkbox: Tienes un recibo o recibos de nominma oficiales (que contenga tu numero de seguridad social)?
+seleccionr: no
+seleccionar opcion del checkbox: tienes algun recibo de nomina o pago donde aparece el nombre de quien te paga el sueldo?
+seleccionar: si
+-Presionar boton: agregar citado
+Aparece formulario Datos del citado llenar campos:
+Dependiendo el caso tipo de persona Fisica o moral seleccionar el checkbox... 
+1.- Si es Fisica
+LLenar campos obligatorios
+a)Nombre del citado
+b)Primer apellido
+-domicilio--
+a)Estado seleccionar: BAJA CALIFORNIA
+b)Seleccionar tipo de vialidad
+c)llenar campo: Nombre de la vialidad o calle
+d)numero de exterior
+e)Colonia
+f)Municipio o alcaldia
+g)codigo postal
+
+-Presionar boton:   Guardar citado
+
+---en caso de ser persona moral
+2. Persona moral, llenar los siguientes campos
+a) Razon Social
+-domicilio-
+b)Seleccionar Estado: Baja California
+c)Seleccionar tipo de vialidad
+d) Llenar campo: Nombre de la vialidad o calle
+e)Numero exterior
+f)Seleccionar opcion del dropdown: Colonia
+g)Seleccionar dropdown: Municipio o alcadia
+h) llenar campo: Codigo postal
+
+Presionar boton: Guardar Citado
+--
+Presionar boton: Validar y Continuar
+
+--- descripcion de los hechos---
+a) llenar la descripcion con: despido injustificado
+b) Presionar boton Validar y Continuar
+
+-nueva pagina con resumen -- ir hasta la parte inferior
+presionar boton: Enviar solicitud
+Sale pop up:
+Presionar boton: Enviar Solicitud
+Sale pop up: Envio de solicitud 
+-presionar boton: Descargar acuse
+----se abre una nueva ventana con el documento en pdf ------
+El usuario podra guardar el documento en su maquina
