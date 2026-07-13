@@ -18,6 +18,7 @@ Diferencias con v1 (código anterior):
     - Los contactos usan contactos[1], contactos[2], contactos[3] (no contactos[0][telefono])
 """
 import logging
+import os
 import re
 import tempfile
 from dataclasses import dataclass, field
@@ -394,13 +395,12 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             # ── En producción (Railway/Docker) siempre forzar headless ──
             # El modo "debug" (headless=False) requiere un servidor X,
             # que no está disponible en contenedores Docker.
-            import os as _os
-            _force_headless = _os.environ.get('FORCE_HEADLESS', 'true').lower() == 'true'
-            _actual_headless = headless if not _force_headless else True
+            force_headless = os.environ.get('FORCE_HEADLESS', 'true').lower() == 'true'
+            actual_headless = headless if not force_headless else True
 
             browser = p.chromium.launch(
-                headless=_actual_headless,
-                slow_mo=300 if not _actual_headless else 100,
+                headless=actual_headless,
+                slow_mo=300 if not actual_headless else 100,
                 args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
                 timeout=20000,
             )
