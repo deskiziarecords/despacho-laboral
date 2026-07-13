@@ -391,7 +391,11 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
     try:
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=headless, slow_mo=300 if not headless else 100)
+            browser = p.chromium.launch(
+                headless=headless,
+                slow_mo=300 if not headless else 100,
+                args=['--no-sandbox', '--disable-setuid-sandbox'],
+            )
             context = browser.new_context(
                 viewport={'width': 1280, 'height': 900},
                 accept_downloads=True,
