@@ -394,7 +394,8 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             browser = p.chromium.launch(
                 headless=headless,
                 slow_mo=300 if not headless else 100,
-                args=['--no-sandbox', '--disable-setuid-sandbox'],
+                args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+                timeout=20000,
             )
             context = browser.new_context(
                 viewport={'width': 1280, 'height': 900},
