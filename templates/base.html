@@ -278,25 +278,15 @@
             padding: 0 10px;
         }
 
-        /* ─── Logo absoluto fuera del menú ────────────────────────── */
-        .logo-absolute {
-            position: absolute;
-            left: 14px;
-            top: 50%;
-            transform: translateY(-50%);
-            z-index: 100;
-            height: 62px;
+        /* ─── Logo en la barra superior ──────────────────────────── */
+        .logo-topbar {
+            height: 42px;
             width: auto;
-            transition: all 0.2s ease;
-            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+            display: block;
+            transition: opacity 0.2s ease;
         }
-        .logo-absolute:hover {
-            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25)) brightness(1.08);
-        }
-        .nav-wrapper {
-            position: relative;
-            padding-left: 210px;
-            min-height: 70px;
+        .logo-topbar:hover {
+            opacity: 0.85;
         }
 
         #appleNav li:first-child {
@@ -348,16 +338,8 @@
 
         /* Responsive: stack nav items on small screens */
         @media (max-width: 768px) {
-            .nav-wrapper {
-                padding-left: 0 !important;
-                padding-top: 72px !important;
-                min-height: auto;
-            }
-            .logo-absolute {
-                left: 50%;
-                transform: translateX(-50%) translateY(0);
-                top: 10px;
-                height: 48px;
+            .logo-topbar {
+                height: 34px;
             }
             #appleNav {
                 flex-wrap: wrap;
@@ -392,6 +374,11 @@
     {% if user.is_authenticated %}
     <!-- User info bar (compact strip above Apple nav) -->
     <div class="flex justify-end items-center" style="background: #1e2530; padding: 3px 16px;">
+        <!-- Logo a la izquierda -->
+        <a href="{% url 'dashboard_redirect' %}" class="mr-auto flex items-center">
+            <img src="{% static 'img/logo.png' %}" alt="Conciliacion Laboral Tijuana" class="logo-topbar">
+        </a>
+
         <!-- Búsqueda Global -->
         <a href="{% url 'busqueda_global' %}?q="
            class="flex items-center justify-center text-gray-400 hover:text-white transition-colors px-2 py-0.5"
@@ -487,10 +474,7 @@
     </div>
 
     <!-- Apple-style Navigation Menu -->
-    <div class="max-w-7xl mx-auto px-3 nav-wrapper" style="padding-top: 8px; padding-bottom: 8px;">
-        <a href="{% url 'dashboard_redirect' %}">
-            <img src="{% static 'img/logo.png' %}" alt="Conciliacion Laboral Tijuana" class="logo-absolute">
-        </a>
+    <div class="max-w-7xl mx-auto px-3" style="padding-top: 8px; padding-bottom: 8px;">
         <ul id="appleNav">
             <li class="{% if request.resolver_match.url_name == 'expediente_list' %}active{% endif %}">
                 <a href="{% url 'expediente_list' %}">Expedientes</a>
