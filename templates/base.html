@@ -278,11 +278,23 @@
             padding: 0 10px;
         }
 
-        #appleNav li a img.logo-nav {
-            vertical-align: middle;
-            margin-top: -2px;
-            height: 22px;
+        /* ─── Logo absoluto fuera del menú ────────────────────────── */
+        .logo-absolute {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
+            height: 42px;
             width: auto;
+            transition: all 0.2s ease;
+        }
+        .logo-absolute:hover {
+            filter: brightness(1.15);
+        }
+        .nav-wrapper {
+            position: relative;
+            padding-left: 160px;
         }
 
         #appleNav li:first-child {
@@ -290,8 +302,6 @@
             -webkit-border-radius: 4px 0 0 4px;
             border-radius: 4px 0 0 4px;
             border-left: none;
-            flex: 0 0 auto;
-            min-width: 120px;
         }
 
         #appleNav li:last-child {
@@ -336,6 +346,16 @@
 
         /* Responsive: stack nav items on small screens */
         @media (max-width: 768px) {
+            .nav-wrapper {
+                padding-left: 0 !important;
+                padding-top: 52px !important;
+            }
+            .logo-absolute {
+                left: 50%;
+                transform: translateX(-50%) translateY(0);
+                top: 8px;
+                height: 36px;
+            }
             #appleNav {
                 flex-wrap: wrap;
                 height: auto;
@@ -352,8 +372,6 @@
                 padding: 0 5px;
             }
             #appleNav li:first-child {
-                min-width: 100%;
-                flex: 1 1 100%;
                 border-radius: 4px 4px 0 0;
             }
             #appleNav li:last-child {
@@ -466,13 +484,11 @@
     </div>
 
     <!-- Apple-style Navigation Menu -->
-    <div class="max-w-7xl mx-auto px-3" style="padding-top: 8px; padding-bottom: 8px;">
+    <div class="max-w-7xl mx-auto px-3 nav-wrapper" style="padding-top: 8px; padding-bottom: 8px;">
+        <a href="{% url 'dashboard_redirect' %}">
+            <img src="{% static 'img/logo.png' %}" alt="Conciliacion Laboral Tijuana" class="logo-absolute">
+        </a>
         <ul id="appleNav">
-            <li>
-                <a href="{% url 'dashboard_redirect' %}">
-                    <img src="{% static 'img/logo.png' %}" alt="Conciliacion Laboral Tijuana" class="logo-nav">
-                </a>
-            </li>
             <li class="{% if request.resolver_match.url_name == 'expediente_list' %}active{% endif %}">
                 <a href="{% url 'expediente_list' %}">Expedientes</a>
             </li>
