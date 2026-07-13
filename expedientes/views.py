@@ -599,7 +599,7 @@ def calendario_audiencias(request):
     # Filtros
     asesor_id = request.GET.get('asesor', '')
     estado = request.GET.get('estado', '')
-    vista = request.GET.get('vista', 'lista')
+    vista = request.GET.get('vista', 'planner')
 
     if asesor_id:
         qs = qs.filter(asesor_id=asesor_id)
@@ -638,8 +638,8 @@ def calendario_audiencias(request):
     semana_offset = int(request.GET.get('semana', 0))
     inicio_semana = hoy - timedelta(days=hoy.weekday()) + timedelta(weeks=semana_offset)
     dias_semana = []
-    nombres_dias_es = ['Lunes', 'Martes', 'Miércoles']  # 3-column design
-    for i in range(3):  # Mon-Wed (user's design)
+    nombres_dias_es = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes']  # 5-column design
+    for i in range(5):  # Mon-Fri (user's design)
         dia = inicio_semana + timedelta(days=i)
         dias_semana.append({
             'fecha': dia,
@@ -652,7 +652,7 @@ def calendario_audiencias(request):
     for e in eventos.select_related('cliente', 'asesor').order_by('fecha_audiencia'):
         if e.fecha_audiencia:
             dia_evento = e.fecha_audiencia.weekday()
-            if dia_evento < 3:  # Mon-Wed
+            if dia_evento < 5:  # Mon-Fri (0=Lun, 1=Mar, 2=Mie, 3=Jue, 4=Vie)
                 dias_semana[dia_evento]['eventos'].append(e)
 
     mes_nombre = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
