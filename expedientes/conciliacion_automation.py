@@ -391,9 +391,16 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
     try:
         with sync_playwright() as p:
+            # ── En producción (Railway/Docker) siempre forzar headless ──
+            # El modo "debug" (headless=False) requiere un servidor X,
+            # que no está disponible en contenedores Docker.
+            import os as _os
+            _force_headless = _os.environ.get('FORCE_HEADLESS', 'true').lower() == 'true'
+            _actual_headless = headless if not _force_headless else True
+
             browser = p.chromium.launch(
-                headless=headless,
-                slow_mo=300 if not headless else 100,
+                headless=_actual_headless,
+                slow_mo=300 if not _actual_headless else 100,
                 args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
                 timeout=20000,
             )
