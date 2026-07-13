@@ -338,6 +338,12 @@ class ExpedienteCreateView(LoginRequiredMixin, CreateView):
             detalle=f'Expediente creado por {self.request.user.get_full_name() or self.request.user.username}'
         )
         messages.success(self.request, f'✅ Expediente {self.object.numero} creado. Ahora puedes programar la audiencia.')
+
+        # Si el usuario eligió "Crear y Enviar a Conciliación", redirigir al flujo de conciliación
+        if self.request.POST.get('action') == 'crear_y_conciliar':
+            messages.info(self.request, '🚀 Expediente creado. Ahora puedes enviar la solicitud al portal de conciliación.')
+            return redirect('enviar_conciliacion_automation', pk=self.object.pk)
+
         return response
 
 

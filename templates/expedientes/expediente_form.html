@@ -144,6 +144,12 @@
                    class="px-4 py-1.5 text-sm text-gray-700 bg-gray-100 rounded hover:bg-gray-200 transition-colors">
                     Cancelar
                 </a>
+                {% if cliente_preseleccionado and not object %}
+                <button type="submit" name="action" value="crear_y_conciliar"
+                        class="px-5 py-1.5 text-sm bg-indigo-700 text-white rounded hover:bg-indigo-600 transition-colors font-semibold flex items-center gap-1.5">
+                    🚀 Crear y Enviar a Conciliación
+                </button>
+                {% endif %}
                 <button type="submit"
                         class="px-5 py-1.5 text-sm bg-gray-800 text-white rounded hover:bg-gray-700 transition-colors font-semibold">
                     {% if object %}Guardar Cambios{% else %}Crear Expediente{% endif %}
