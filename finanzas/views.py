@@ -1149,3 +1149,383 @@ def distribucion_confirmar(request, pk):
     return redirect('profitdistribution_detail', pk=pk)
 
 
+
+
+# ─── Reportes de Convenios ────────────────────────────────────────────────
+
+
+class ReporteConveniosView(LoginRequiredMixin, AdminOrSuperOnlyMixin, TemplateView):
+    """
+    Reporte de Convenios con filtros semanal, mensual y anual.
+    """
+    template_name = 'finanzas/reporte_convenios.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        hoy = timezone.now()
+        periodo = self.request.GET.get('periodo', 'mensual')
+        oficina_id = self.request.GET.get('oficina')
+        year = int(self.request.GET.get('year', hoy.year))
+        month = int(self.request.GET.get('month', hoy.month))
+        semana_num = int(self.request.GET.get('semana', '')) if self.request.GET.get('semana') else None
+
+        def filtrar_oficina(qs):
+            if oficina_id:
+                return qs.filter(oficina_id=oficina_id)
+            return qs
+
+        def filtrar_fecha(qs, desde, hasta):
+            qs = qs.filter(fecha__gte=desde)
+            qs = qs.filter(fecha__lte=hasta)
+            return qs
+
+        # ─── Determinar rango de fechas ───────────────────────────────
+        if periodo == 'semanal':
+            if semana_num:
+                # Buscar la semana especifica
+                try:
+                    ww = WorkWeek.objects.get(numero=semana_num, fecha_inicio__year=year)
+                    fecha_desde = ww.fecha_inicio
+                    fecha_hasta = ww.fecha_fin
+                    etiqueta = f'Semana {ww.numero} ({ww.fecha_inicio.strftime("%d/%m")} - {ww.fecha_fin.strftime("%d/%m/%Y")})'
+                except WorkWeek.DoesNotExist:
+                    # Calcular aproximado
+                    import datetime
+                    primer_dia = datetime.date(year, 1, 1)
+                    dias_avance = (semana_num - 1) * 7
+                    inicio = primer_dia + timedelta(days=dias_avance - primer_dia.weekday())
+                    fin = inicio + timedelta(days=6)
+                    fecha_desde = inicio
+                    fecha_hasta = fin
+                    etiqueta = f'Semana {semana_num} ({inicio.strftime("%d/%m")} - {fin.strftime("%d/%m/%Y")})'
+            else:
+                # Semana actual
+                ww = WorkWeek.semana_actual()
+                fecha_desde = ww.fecha_inicio
+                fecha_hasta = ww.fecha_fin
+                etiqueta = f'Semana {ww.numero} actual ({fecha_desde.strftime("%d/%m")} - {fecha_hasta.strftime("%d/%m/%Y")})'
+        elif periodo == 'anual':
+            fecha_desde = hoy.replace(year=year, month=1, day=1).date()
+            fecha_hasta = hoy.replace(year=year, month=12, day=31).date()
+            etiqueta = f'Año {year}'
+        else:  # mensual
+            fecha_desde = hoy.replace(year=year, month=month, day=1).date()
+            if month == 12:
+                fecha_hasta = hoy.replace(year=year+1, month=1, day=1).date() - timedelta(days=1)
+            else:
+                fecha_hasta = hoy.replace(year=year, month=month+1, day=1).date() - timedelta(days=1)
+            etiqueta = f'{hoy.replace(month=month).strftime("%B %Y").capitalize()}'
+
+        # ─── Query base ───────────────────────────────────────────────
+        qs = filtrar_oficina(filtrar_fecha(
+            Agreement.objects.select_related('cliente', 'oficina', 'responsable'),
+            fecha_desde, fecha_hasta
+        ))
+
+        # ─── 1. Totales ───────────────────────────────────────────────
+        totales = qs.aggregate(
+            total_convenios=Count('pk'),
+            total_monto=Sum('monto_convenio'),
+            total_honorarios=Sum('honorarios'),
+            pagados=Count('pk', filter=Q(estado='pagado')),
+            pendientes=Count('pk', filter=Q(estado='pendiente')),
+            firmados=Count('pk', filter=Q(estado='firmado')),
+            cancelados=Count('pk', filter=Q(estado='cancelado')),
+        )
+        context['total_convenios'] = totales['total_convenios'] or 0
+        context['total_monto'] = totales['total_monto'] or 0
+        context['total_honorarios'] = totales['total_honorarios'] or 0
+        context['pagados'] = totales['pagados'] or 0
+        context['pendientes'] = totales['pendientes'] or 0
+        context['firmados'] = totales['firmados'] or 0
+        context['cancelados'] = totales['cancelados'] or 0
+        context['promedio_monto'] = (totales['total_monto'] / totales['total_convenios']) if totales['total_convenios'] else 0
+
+        # ─── 2. Por oficina ───────────────────────────────────────────
+        por_oficina = qs.values('oficina__nombre', 'oficina_id').annotate(
+            total=Count('pk'),
+            monto=Sum('monto_convenio'),
+            honorarios=Sum('honorarios')
+        ).order_by('-monto')
+        context['por_oficina'] = por_oficina
+
+        # ─── 3. Por estado ────────────────────────────────────────────
+        por_estado = qs.values('estado').annotate(
+            total=Count('pk'),
+            monto=Sum('monto_convenio')
+        ).order_by('-total')
+        context['por_estado'] = por_estado
+
+        # ─── 4. Por responsable ───────────────────────────────────────
+        por_responsable = qs.values('responsable__first_name', 'responsable__last_name', 'responsable_id').annotate(
+            total=Count('pk'),
+            monto=Sum('monto_convenio'),
+            honorarios=Sum('honorarios')
+        ).order_by('-monto')
+        context['por_responsable'] = por_responsable
+
+        # ─── 5. Top 10 clientes ───────────────────────────────────────
+        top_clientes = qs.values('cliente__nombre', 'cliente_id').annotate(
+            total=Count('pk'),
+            monto=Sum('monto_convenio')
+        ).order_by('-monto')[:10]
+        context['top_clientes'] = top_clientes
+
+        # ─── 6. Listado detallado ─────────────────────────────────────
+        context['convenios'] = qs.select_related(
+            'cliente', 'oficina', 'responsable'
+        ).order_by('-fecha')[:50]
+
+        # ─── 7. Evolución mensual (para anual) ────────────────────────
+        if periodo == 'anual':
+            evolucion = []
+            for m in range(1, 13):
+                m_inicio = hoy.replace(year=year, month=m, day=1).date()
+                if m == 12:
+                    m_fin = hoy.replace(year=year+1, month=1, day=1).date() - timedelta(days=1)
+                else:
+                    m_fin = hoy.replace(year=year, month=m+1, day=1).date() - timedelta(days=1)
+
+                m_qs = filtrar_oficina(filtrar_fecha(
+                    Agreement.objects.filter(fecha__year=year),
+                    m_inicio, m_fin
+                ))
+                mt = m_qs.aggregate(
+                    total=Count('pk'),
+                    monto=Sum('monto_convenio'),
+                    hon=Sum('honorarios')
+                )
+                evolucion.append({
+                    'mes': hoy.replace(month=m).strftime('%b'),
+                    'total': mt['total'] or 0,
+                    'monto': float(mt['monto'] or 0),
+                    'honorarios': float(mt['hon'] or 0),
+                })
+            context['evolucion_mensual'] = evolucion
+
+        # ─── Contexto ─────────────────────────────────────────────────
+        context['periodo'] = periodo
+        context['etiqueta'] = etiqueta
+        context['fecha_desde'] = fecha_desde
+        context['fecha_hasta'] = fecha_hasta
+        context['year'] = year
+        context['month'] = month
+        context['semana_num'] = semana_num
+        context['oficinas'] = Office.objects.filter(activa=True)
+        context['oficina_seleccionada'] = int(oficina_id) if oficina_id else None
+        context['years'] = range(2023, hoy.year + 2)
+        context['months'] = range(1, 13)
+        context['month_names'] = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+        context['semanas'] = WorkWeek.objects.filter(fecha_inicio__year=year).order_by('numero')
+        context['hoy'] = hoy
+
+        # Calcular max_monto para la grafica de evolucion
+        if periodo == 'anual' and evolucion:
+            context['max_monto_chart'] = max(ev['monto'] for ev in evolucion) or 1
+        else:
+            context['max_monto_chart'] = 1
+
+        return context
+
+
+@login_required
+def exportar_reporte_convenios_excel(request):
+    """
+    Exporta el reporte de convenios a Excel.
+    """
+    if not hasattr(request.user, 'profile') or request.user.profile.rol not in ['admin', 'superadmin', 'finanzas']:
+        return redirect('dashboard_asesor')
+
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+
+        wb = openpyxl.Workbook()
+
+        header_font = Font(bold=True, color='FFFFFF', size=10)
+        header_fill = PatternFill(start_color='1F2937', end_color='1F2937', fill_type='solid')
+        header_align = Alignment(horizontal='center', vertical='center')
+        thin_border = Border(
+            left=Side(style='thin'), right=Side(style='thin'),
+            top=Side(style='thin'), bottom=Side(style='thin')
+        )
+        title_font = Font(bold=True, size=12, color='1F2937')
+
+        def estilo_header(ws, num_cols):
+            for col in range(1, num_cols + 1):
+                cell = ws.cell(row=1, column=col)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = header_align
+                cell.border = thin_border
+
+        def auto_ancho(ws, min_width=12, max_width=45):
+            for col_cells in ws.columns:
+                length = max((len(str(c.value or '')) for c in col_cells), default=0)
+                ws.column_dimensions[get_column_letter(col_cells[0].column)].width = min(max(length + 3, min_width), max_width)
+
+        # Replicar la logica de ReporteConveniosView
+        hoy = timezone.now()
+        periodo = request.GET.get('periodo', 'mensual')
+        oficina_id = request.GET.get('oficina')
+        year = int(request.GET.get('year', hoy.year))
+        month = int(request.GET.get('month', hoy.month))
+        semana_num = int(request.GET.get('semana', '')) if request.GET.get('semana') else None
+
+        def filtrar_oficina(qs):
+            if oficina_id:
+                return qs.filter(oficina_id=oficina_id)
+            return qs
+
+        def filtrar_fecha(qs, desde, hasta):
+            return qs.filter(fecha__gte=desde, fecha__lte=hasta)
+
+        if periodo == 'semanal':
+            if semana_num:
+                ww = WorkWeek.objects.filter(numero=semana_num, fecha_inicio__year=year).first()
+                if ww:
+                    fd, fh = ww.fecha_inicio, ww.fecha_fin
+                else:
+                    fd = hoy.date() - timedelta(days=hoy.weekday())
+                    fh = fd + timedelta(days=6)
+            else:
+                ww = WorkWeek.semana_actual()
+                fd, fh = ww.fecha_inicio, ww.fecha_fin
+        elif periodo == 'anual':
+            fd = hoy.replace(year=year, month=1, day=1).date()
+            fh = hoy.replace(year=year, month=12, day=31).date()
+        else:
+            fd = hoy.replace(year=year, month=month, day=1).date()
+            if month == 12:
+                fh = hoy.replace(year=year+1, month=1, day=1).date() - timedelta(days=1)
+            else:
+                fh = hoy.replace(year=year, month=month+1, day=1).date() - timedelta(days=1)
+
+        qs = filtrar_oficina(filtrar_fecha(
+            Agreement.objects.select_related('cliente', 'oficina', 'responsable'), fd, fh
+        )).order_by('-fecha')
+
+        # Hoja 1: Resumen
+        ws1 = wb.active
+        ws1.title = 'Resumen'
+        ws1.cell(row=1, column=1, value=f'Reporte de Convenios - {periodo.capitalize()}').font = title_font
+        ws1.merge_cells('A1:G1')
+        ws1.cell(row=2, column=1, value=f'Generado: {hoy.strftime("%d/%m/%Y %H:%M")}').font = Font(size=9, color='666666')
+        ws1.merge_cells('A2:G2')
+
+        headers = ['Fecha', 'Cliente', 'Empresa', 'Oficina', 'Monto Convenio', 'Honorarios', 'Estado', 'Responsable']
+        row = 4
+        for col, h in enumerate(headers, 1):
+            ws1.cell(row=row, column=col, value=h)
+        estilo_header(ws1, len(headers))
+        row += 1
+
+        totals = {'monto': 0, 'honorarios': 0}
+        for c in qs:
+            ws1.cell(row=row, column=1, value=c.fecha.strftime('%d/%m/%Y')).border = thin_border
+            ws1.cell(row=row, column=2, value=c.cliente.nombre).border = thin_border
+            ws1.cell(row=row, column=3, value=c.empresa).border = thin_border
+            ws1.cell(row=row, column=4, value=c.oficina.nombre).border = thin_border
+            cell = ws1.cell(row=row, column=5, value=float(c.monto_convenio))
+            cell.number_format = '$#,##0.00'
+            cell.border = thin_border
+            cell = ws1.cell(row=row, column=6, value=float(c.honorarios))
+            cell.number_format = '$#,##0.00'
+            cell.border = thin_border
+            ws1.cell(row=row, column=7, value=c.get_estado_display()).border = thin_border
+            ws1.cell(row=row, column=8, value=c.responsable.get_full_name() or c.responsable.username).border = thin_border
+            totals['monto'] += float(c.monto_convenio)
+            totals['honorarios'] += float(c.honorarios)
+            row += 1
+
+        row += 1
+        ws1.cell(row=row, column=1, value='TOTALES').font = Font(bold=True)
+        ws1.cell(row=row, column=1).border = thin_border
+        cell = ws1.cell(row=row, column=5, value=totals['monto'])
+        cell.font = Font(bold=True)
+        cell.number_format = '$#,##0.00'
+        cell.border = thin_border
+        cell = ws1.cell(row=row, column=6, value=totals['honorarios'])
+        cell.font = Font(bold=True)
+        cell.number_format = '$#,##0.00'
+        cell.border = thin_border
+
+        ws1.cell(row=row+1, column=1, value=f'Total Convenios: {qs.count()}').font = Font(size=10, italic=True)
+        auto_ancho(ws1)
+
+        # Hoja 2: Por Oficina
+        ws2 = wb.create_sheet('Por Oficina')
+        headers = ['Oficina', 'Convenios', 'Monto Total', 'Honorarios']
+        for col, h in enumerate(headers, 1):
+            ws2.cell(row=1, column=col, value=h)
+        estilo_header(ws2, len(headers))
+
+        por_oficina = qs.values('oficina__nombre').annotate(
+            total=Count('pk'), monto=Sum('monto_convenio'), hon=Sum('honorarios')
+        ).order_by('-monto')
+        for i, of in enumerate(por_oficina, 2):
+            ws2.cell(row=i, column=1, value=of['oficina__nombre']).border = thin_border
+            ws2.cell(row=i, column=2, value=of['total']).border = thin_border
+            c = ws2.cell(row=i, column=3, value=float(of['monto']))
+            c.number_format = '$#,##0.00'
+            c.border = thin_border
+            c = ws2.cell(row=i, column=4, value=float(of['hon']))
+            c.number_format = '$#,##0.00'
+            c.border = thin_border
+        auto_ancho(ws2)
+
+        # Hoja 3: Por Responsable
+        ws3 = wb.create_sheet('Por Abogado')
+        headers = ['Abogado', 'Convenios', 'Monto Total', 'Honorarios']
+        for col, h in enumerate(headers, 1):
+            ws3.cell(row=1, column=col, value=h)
+        estilo_header(ws3, len(headers))
+
+        por_resp = qs.values('responsable__first_name', 'responsable__last_name').annotate(
+            total=Count('pk'), monto=Sum('monto_convenio'), hon=Sum('honorarios')
+        ).order_by('-monto')
+        for i, r in enumerate(por_resp, 2):
+            nombre = f"{r['responsable__first_name'] or ''} {r['responsable__last_name'] or ''}".strip() or 'Sin asignar'
+            ws3.cell(row=i, column=1, value=nombre).border = thin_border
+            ws3.cell(row=i, column=2, value=r['total']).border = thin_border
+            c = ws3.cell(row=i, column=3, value=float(r['monto']))
+            c.number_format = '$#,##0.00'
+            c.border = thin_border
+            c = ws3.cell(row=i, column=4, value=float(r['hon']))
+            c.number_format = '$#,##0.00'
+            c.border = thin_border
+        auto_ancho(ws3)
+
+        # Hoja 4: Por Estado
+        ws4 = wb.create_sheet('Por Estado')
+        headers = ['Estado', 'Convenios', 'Monto']
+        for col, h in enumerate(headers, 1):
+            ws4.cell(row=1, column=col, value=h)
+        estilo_header(ws4, len(headers))
+
+        
+        por_estado = qs.values('estado').annotate(
+            total=Count('pk'), monto=Sum('monto_convenio')
+        ).order_by('-total')
+        for i, e in enumerate(por_estado, 2):
+            ws4.cell(row=i, column=1, value=dict(Agreement.ESTADO_CHOICES).get(e['estado'], e['estado'])).border = thin_border
+            ws4.cell(row=i, column=2, value=e['total']).border = thin_border
+            c = ws4.cell(row=i, column=3, value=float(e['monto']))
+            c.number_format = '$#,##0.00'
+            c.border = thin_border
+        auto_ancho(ws4)
+
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        timestamp = hoy.strftime('%Y%m%d_%H%M')
+        response['Content-Disposition'] = f'attachment; filename=reporte_convenios_{timestamp}.xlsx'
+        wb.save(response)
+        return response
+
+    except ImportError:
+        return HttpResponse('openpyxl no esta instalado. Ejecute: pip install openpyxl', status=500)
+    except Exception as e:
+        logger.exception("Error exportando reporte de convenios")
+        return HttpResponse(f'Error al generar el Excel: {e}', status=500)

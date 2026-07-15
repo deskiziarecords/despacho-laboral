@@ -43,4 +43,7 @@ urlpatterns = [
     path('distribuciones/<int:pk>/', views.ProfitDistributionDetailView.as_view(), name='profitdistribution_detail'),
     path('distribuciones/<int:pk>/editar/', views.ProfitDistributionUpdateView.as_view(), name='profitdistribution_update'),
     path('distribuciones/<int:pk>/confirmar/', views.distribucion_confirmar, name='profitdistribution_confirmar'),
+    # Reportes de Convenios
+    path('reportes/convenios/', views.ReporteConveniosView.as_view(), name='reporte_convenios'),
+    path('reportes/convenios/exportar-excel/', views.exportar_reporte_convenios_excel, name='exportar_reporte_convenios_excel'),
 ]
