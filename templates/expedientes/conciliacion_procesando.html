@@ -200,6 +200,10 @@
             document.getElementById('result-folio').textContent = data.folio || 'N/A';
             const elapsed = Math.floor((data.completed_at ? new Date(data.completed_at).getTime() - new Date(data.created_at).getTime() : Date.now() - START_TIME) / 1000);
             document.getElementById('result-time').textContent = elapsed < 60 ? elapsed + 's' : Math.floor(elapsed / 60) + 'm ' + (elapsed % 60) + 's';
+            // Auto-redirigir al expediente después de 3 segundos
+            setTimeout(function() {
+                window.location.href = EXPEDIENTE_URL;
+            }, 3000);
         } else if (data.estado === 'fallido') {
             loadingState.classList.add('hidden');
             failedState.classList.remove('hidden');
