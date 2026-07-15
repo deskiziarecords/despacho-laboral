@@ -185,6 +185,17 @@ def notificar_conciliacion_por_email(sender, instance, **kwargs):
         else f'❌ Conciliación fallida — {expediente.numero}'
     )
 
+    # ── Verificar configuración de email ──────────────────────────
+    # Si EMAIL_BACKEND es "console", no enviar (solo logea en consola)
+    from django.conf import settings
+    email_backend = getattr(settings, 'EMAIL_BACKEND', '')
+    if email_backend != 'django.core.mail.backends.smtp.EmailBackend':
+        logger.info(
+            'EMAIL_BACKEND=%s, omitiendo envío real de notificación para tarea %s',
+            email_backend, instance.pk
+        )
+        return
+
     # Renderizar plantilla de texto plano
     mensaje_texto = render_to_string('expedientes/email_conciliacion.txt', contexto)
 
@@ -194,7 +205,7 @@ def notificar_conciliacion_por_email(sender, instance, **kwargs):
             message=mensaje_texto,
             from_email=None,  # usa DEFAULT_FROM_EMAIL de settings
             recipient_list=[destinatario.email],
-            fail_silently=False,
+            fail_silently=True,  # No bloquear si SMTP falla
         )
         logger.info(
             'Notificación de conciliación enviada a %s para tarea %s (estado: %s)',
