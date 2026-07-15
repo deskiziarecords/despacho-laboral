@@ -2126,3 +2126,41 @@ def subir_conciliacion_pdf(request, pk):
         return redirect('expediente_detail', pk=expediente.pk)
 
     return redirect('expediente_detail', pk=expediente.pk)
+
+
+@login_required
+def descargar_conciliacion_pdf(request, pk):
+    """
+    Genera y descarga un PDF del formulario de conciliación prellenado
+    con todos los datos del expediente, listo para imprimir y presentar
+    en el Centro de Conciliación Laboral.
+
+    Alternativa al envio automático (Playwright) que evita los problemas
+    de automatización con el portal del gobierno.
+    """
+    expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+
+    try:
+        from weasyprint import HTML
+
+        html_string = render_to_string('expedientes/pdf_conciliacion_form.html', {
+            'expediente': expediente,
+            'hoy': timezone.now(),
+        })
+
+        nombre_archivo = f'Solicitud_Conciliacion_{expediente.numero}.pdf'
+
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="{nombre_archivo}"'
+
+        HTML(string=html_string).write_pdf(response)
+
+        return response
+
+    except ImportError:
+        messages.error(request, 'WeasyPrint no está instalado. Contacta al administrador.')
+        return redirect('expediente_detail', pk=expediente.pk)
+    except Exception as e:
+        logger.exception('Error generando PDF de conciliación para expediente %s', expediente.numero)
+        messages.error(request, f'Error al generar el PDF: {e}')
+        return redirect('expediente_detail', pk=expediente.pk)

@@ -29,6 +29,10 @@
                             🤖 Envío Automático
                             <span class="text-[10px] text-gray-400 ml-auto">(Playwright)</span>
                         </a>
+                        <a href="{% url 'descargar_conciliacion_pdf' expediente.pk %}" class="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition flex items-center gap-2">
+                            📥 Descargar Formulario
+                            <span class="text-[10px] text-gray-400 ml-auto">(PDF prellenado)</span>
+                        </a>
                         <div class="border-t border-gray-100 my-1"></div>
                         <div class="px-4 py-2.5">
                             <form method="post" action="{% url 'subir_conciliacion_pdf' expediente.pk %}" enctype="multipart/form-data" class="space-y-2">

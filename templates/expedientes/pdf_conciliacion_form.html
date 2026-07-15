@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Formulario Conciliación - {{ expediente.numero }}</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 1.8cm 1.5cm;
+        }
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-size: 10pt;
+            color: #1a1a1a;
+            line-height: 1.4;
+        }
+        .header-grid {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #1e3a8a;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .header-left h1 {
+            font-size: 14pt;
+            color: #1e3a8a;
+            margin: 0;
+        }
+        .header-left p {
+            font-size: 9pt;
+            color: #555;
+            margin: 2px 0;
+        }
+        .header-right {
+            text-align: right;
+            font-size: 8pt;
+            color: #666;
+        }
+        .title {
+            text-align: center;
+            font-size: 13pt;
+            font-weight: bold;
+            color: #1e3a8a;
+            margin: 15px 0 5px;
+        }
+        .subtitle {
+            text-align: center;
+            font-size: 9pt;
+            color: #555;
+            margin-bottom: 15px;
+        }
+        .section-title {
+            background: #1e3a8a;
+            color: white;
+            padding: 4px 8px;
+            font-size: 9pt;
+            font-weight: bold;
+            margin: 12px 0 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .section-body {
+            border: 1px solid #ccc;
+            border-top: none;
+            padding: 8px 10px;
+        }
+        .field-row {
+            display: flex;
+            flex-wrap: wrap;
+            margin-bottom: 4px;
+        }
+        .field-row:last-child {
+            margin-bottom: 0;
+        }
+        .field-group {
+            flex: 1;
+            min-width: 120px;
+            margin-right: 10px;
+        }
+        .field-group:last-child {
+            margin-right: 0;
+        }
+        .field-label {
+            font-size: 7pt;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .field-value {
+            font-size: 9pt;
+            color: #1a1a1a;
+            border-bottom: 1px solid #999;
+            padding: 1px 4px;
+            min-height: 16px;
+        }
+        .field-value-empty {
+            border-bottom: 1px dashed #ccc;
+            color: #aaa;
+            font-style: italic;
+        }
+        .checklist {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px 15px;
+        }
+        .check-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 8.5pt;
+        }
+        .check-box {
+            display: inline-block;
+            width: 11px;
+            height: 11px;
+            border: 1.5px solid #333;
+            text-align: center;
+            line-height: 11px;
+            font-size: 9pt;
+            flex-shrink: 0;
+        }
+        .check-box.checked::after {
+            content: "✓";
+            font-weight: bold;
+            color: #1e3a8a;
+        }
+        .signature-area {
+            margin-top: 25px;
+            text-align: center;
+        }
+        .signature-line {
+            display: inline-block;
+            width: 250px;
+            border-top: 1px solid #333;
+            margin-top: 40px;
+            padding-top: 6px;
+            font-size: 9pt;
+        }
+        .footer-note {
+            margin-top: 20px;
+            font-size: 7pt;
+            color: #888;
+            text-align: center;
+            border-top: 1px solid #ddd;
+            padding-top: 8px;
+        }
+        .page-break {
+            page-break-before: always;
+        }
+        .highlight-box {
+            background: #f0f4ff;
+            border: 1px solid #b3c9ff;
+            border-radius: 4px;
+            padding: 6px 10px;
+            margin-bottom: 8px;
+            font-size: 8pt;
+            color: #1e3a8a;
+        }
+        @media print {
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="no-print" style="background:#fef3cd;border:1px solid #f59e0b;padding:8px 12px;margin-bottom:12px;border-radius:4px;font-size:9pt;">
+        ⚠️ Esta es una vista previa. Usa <strong>Ctrl+P</strong> → "Guardar como PDF" para descargar.
+    </div>
+
+    <!-- HEADER -->
+    <div class="header-grid">
+        <div class="header-left">
+            <h1>BAJA CALIFORNIA</h1>
+            <p><strong>Centro de Conciliación Laboral</strong></p>
+            <p>Unidad Sede: Tijuana</p>
+        </div>
+        <div class="header-right">
+            <p><strong>Formato para iniciar la solicitud</strong></p>
+            <p>Expediente: {{ expediente.numero }}</p>
+            <p>Fecha: {% now "d/m/Y" %}</p>
+        </div>
+    </div>
+
+    <div class="title">SOLICITUD DE CONCILIACIÓN PREVIA</div>
+    <div class="subtitle">(Artículo 4 de la Ley de Conciliación Laboral de Baja California)</div>
+
+    <!-- INFORMACIÓN DEL TRABAJADOR -->
+    <div class="section-title">1. Información del Trabajador (Solicitante)</div>
+    <div class="section-body">
+        <div class="field-row">
+            <div class="field-group" style="flex:2;">
+                <div class="field-label">Nombre Completo</div>
+                <div class="field-value">{{ expediente.cliente.nombre }}</div>
+            </div>
+            <div class="field-group" style="flex:1;">
+                <div class="field-label">CURP</div>
+                <div class="field-value">{{ expediente.cliente.curp }}</div>
+            </div>
+        </div>
+        <div class="field-row">
+            <div class="field-group">
+                <div class="field-label">Fecha de Nacimiento</div>
+                <div class="field-value">{{ expediente.cliente.fecha_nacimiento|date:"d/m/Y"|default:"______________" }}</div>
+            </div>
+            <div class="field-group">
+                <div class="field-label">Edad</div>
+                <div class="field-value">{% if expediente.cliente.fecha_nacimiento %}{{ expediente.cliente.fecha_nacimiento|timesince }}{% else %}______________{% endif %}</div>
+            </div>
+            <div class="field-group">
+                <div class="field-label">Género</div>
+                <div class="field-value">{{ expediente.cliente.get_genero_display|default:"______________" }}</div>
+            </div>
+        </div>
+        <div class="field-row">
+            <div class="field-group">
+                <div class="field-label">Teléfono</div>
+                <div class="field-value">{{ expediente.cliente.telefono|default:"______________" }}</div>
+            </div>
+            <div class="field-group" style="flex:2;">
+                <div class="field-label">Correo Electrónico</div>
+                <div class="field-value">{{ expediente.cliente.email|default:"______________" }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DOMICILIO -->
+    <div class="section-title">2. Domicilio Particular</div>
+    <div class="section-body">
+        <div class="field-row">
+            <div class="field-group" style="flex:2;">
+                <div class="field-label">Calle</div>
+                <div class="field-value">{{ expediente.cliente.direccion_calle|default:"______________" }}</div>
+            </div>
+            <div class="field-group">
+                <div class="field-label">Número Exterior</div>
+                <div class="field-value">{{ expediente.cliente.direccion_numero|default:"______________" }}</div>
+            </div>
+            <div class="field-group">
+                <div class="field-label">Código Postal</div>
+                <div class="field-value">{{ expediente.cliente.direccion_cp|default:"______________" }}</div>
+            </div>
+        </div>
+        <div class="field-row">
+            <div class="field-group" style="flex:2;">
+                <div class="field-label">Colonia / Ejido / Poblado</div>
+                <div class="field-value">{{ expediente.cliente.direccion_colonia|default:"______________" }}</div>
+            </div>
+            <div class="field-group">
+                <div class="field-label">Municipio</div>
+                <div class="field-value">Tijuana</div>
+            </div>
+            <div class="field-group">
+                <div class="field-label">Estado</div>
+                <div class="field-value">Baja California</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DATOS DEL EMPLEO -->
+    <div class="section-title">3. Datos del Empleo</div>
+    <div class="section-body">
+        <div class="field-row">
+            <div class="field-group">
+                <div class="field-label">Puesto Desempeñado</div>
+                <div class="field-value">{{ expediente.cliente.puesto|default:"______________" }}</div>
+            </div>
+            <div class="field-group">
+                <div class="field-label">Salario Mensual</div>
+                <div class="field-value">{% if expediente.cliente.salario %}${{ expediente.cliente.salario|floatformat:2 }}{% else %}______________{% endif %}</div>
+            </div>
+        </div>
+        <div class="field-row">
+            <div class="field-group">
+                <div class="field-label">Periodo de Pago</div>
+                <div class="field-value">{{ expediente.cliente.get_periodo_pago_display|default:"______________" }}</div>
+            </div>
+            <div class="field-group">
+                <div class="field-label">Horas Semanales</div>
+                <div class="field-value">{{ expediente.cliente.horas_semanales|default:"______________" }}</div>
+            </div>
+            <div class="field-group">
+                <div class="field-label">Tipo de Jornada</div>
+                <div class="field-value">{{ expediente.cliente.get_jornada_display|default:"______________" }}</div>
+            </div>
+        </div>
+        <div class="field-row">
+            <div class="field-group">
+                <div class="field-label">Fecha de Ingreso</div>
+                <div class="field-value">{{ expediente.cliente.fecha_ingreso|date:"d/m/Y"|default:"______________" }}</div>
+            </div>
+            <div class="field-group">
+                <div class="field-label">Fecha de Salida / Despido</div>
+                <div class="field-value">{{ expediente.cliente.fecha_salida|date:"d/m/Y"|default:"______________" }}</div>
+            </div>
+        </div>
+        <div class="field-row">
+            <div class="field-group" style="flex:2;">
+                <div class="field-label">Motivo / Tipo de Despido</div>
+                <div class="field-value">{{ expediente.get_tipo_despido_display|default:"______________" }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- EMPRESA / PATRÓN -->
+    <div class="section-title">4. Datos de la Empresa / Patrón (Citado)</div>
+    <div class="section-body">
+        <div class="field-row">
+            <div class="field-group" style="flex:2;">
+                <div class="field-label">Nombre / Razón Social</div>
+                <div class="field-value">{{ expediente.cliente.empresa_razon_social|default:expediente.cliente.empresa|default:"______________" }}</div>
+            </div>
+            <div class="field-group">
+                <div class="field-label">Tipo de Persona</div>
+                <div class="field-value">{{ expediente.cliente.get_tipo_persona_citado_display|default:"______________" }}</div>
+            </div>
+        </div>
+        <div class="field-row">
+            <div class="field-group" style="flex:2;">
+                <div class="field-label">Actividad Económica</div>
+                <div class="field-value">{{ expediente.cliente.empresa_actividad|default:"______________" }}</div>
+            </div>
+            <div class="field-group">
+                <div class="field-label">Teléfono</div>
+                <div class="field-value">{{ expediente.cliente.empresa_telefono|default:"______________" }}</div>
+            </div>
+        </div>
+        <div class="field-row">
+            <div class="field-group" style="flex:2;">
+                <div class="field-label">Calle / Domicilio</div>
+                <div class="field-value">{{ expediente.cliente.empresa_calle|default:"______________" }}</div>
+            </div>
+            <div class="field-group">
+                <div class="field-label">Número</div>
+                <div class="field-value">{{ expediente.cliente.empresa_numero|default:"______________" }}</div>
+            </div>
+        </div>
+        <div class="field-row">
+            <div class="field-group">
+                <div class="field-label">Colonia</div>
+                <div class="field-value">{{ expediente.cliente.empresa_colonia|default:"______________" }}</div>
+            </div>
+            <div class="field-group">
+                <div class="field-label">Código Postal</div>
+                <div class="field-value">{{ expediente.cliente.empresa_cp|default:"______________" }}</div>
+            </div>
+            <div class="field-group">
+                <div class="field-label">RFC</div>
+                <div class="field-value">{{ expediente.cliente.rfc|default:"______________" }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- OBJETO DE LA SOLICITUD -->
+    <div class="section-title">5. Objeto de la Solicitud</div>
+    <div class="section-body">
+        <div class="checklist">
+            <label class="check-item">
+                <span class="check-box {% if expediente.tipo_despido == 'injustificado' or expediente.tipo_despido == 'justificado' %}checked{% endif %}"></span>
+                Despido
+            </label>
+            <label class="check-item">
+                <span class="check-box"></span>
+                Terminación voluntaria
+            </label>
+            <label class="check-item">
+                <span class="check-box"></span>
+                Derecho de antigüedad
+            </label>
+            <label class="check-item">
+                <span class="check-box"></span>
+                Rescisión de la relación laboral
+            </label>
+            <label class="check-item">
+                <span class="check-box"></span>
+                Pago de prestaciones
+            </label>
+            <label class="check-item">
+                <span class="check-box"></span>
+                Derecho de preferencia
+            </label>
+            <label class="check-item">
+                <span class="check-box"></span>
+                Derecho de ascenso
+            </label>
+            <label class="check-item">
+                <span class="check-box"></span>
+                Acoso laboral
+            </label>
+        </div>
+        <div style="margin-top:8px;font-size:8pt;color:#666;">
+            * Marque con una ✓ los objetos que aplican a su caso.
+        </div>
+    </div>
+
+    <!-- PRESTACIONES RECLAMADAS -->
+    <div class="section-title">6. Prestaciones Reclamadas</div>
+    <div class="section-body">
+        {% if expediente.prestaciones_reclamadas %}
+        <div class="field-value" style="border:none;padding:4px 0;white-space:pre-wrap;">{{ expediente.prestaciones_reclamadas }}</div>
+        {% else %}
+        <div class="checklist">
+            <label class="check-item"><span class="check-box checked"></span> Indemnización Constitucional (3 meses)</label>
+            <label class="check-item"><span class="check-box checked"></span> Prima de Antigüedad</label>
+            <label class="check-item"><span class="check-box checked"></span> Aguinaldo Proporcional</label>
+            <label class="check-item"><span class="check-box checked"></span> Vacaciones Proporcionales</label>
+            <label class="check-item"><span class="check-box checked"></span> Prima Vacacional</label>
+            <label class="check-item"><span class="check-box"></span> Salarios Caídos</label>
+        </div>
+        {% endif %}
+        <div class="highlight-box" style="margin-top:6px;">
+            <strong>Monto Total Reclamado:</strong>
+            {% if expediente.monto_reclamado %}
+            ${{ expediente.monto_reclamado|floatformat:2 }} M.N.
+            {% else %}
+            El que resulte de acuerdo a la Ley Federal del Trabajo
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- DESCRIPCIÓN DE LOS HECHOS -->
+    <div class="section-title">7. Descripción de los Hechos</div>
+    <div class="section-body">
+        <div class="field-value" style="border:none;min-height:80px;white-space:pre-wrap;line-height:1.6;">
+El día {{ expediente.cliente.fecha_salida|date:"d/m/Y"|default:"[fecha del despido]" }}, el suscrito trabajador{% if expediente.cliente.puesto %} que desempeñaba el puesto de {{ expediente.cliente.puesto }}{% endif %}{% if expediente.cliente.empresa %}, fui despedido de mi empleo en la empresa {{ expediente.cliente.empresa_razon_social|default:expediente.cliente.empresa }}{% endif %},{% if expediente.tipo_despido == 'injustificado' %} de manera injustificada, sin que mediara causa legal alguna para ello.{% elif expediente.tipo_despido == 'rescision' %} por causas imputables al patrón, violentando en mi perjuicio lo dispuesto por la Ley Federal del Trabajo vigente.{% else %} violentando en mi perjuicio las disposiciones contenidas en la Ley Federal del Trabajo.{% endif %}
+
+{% if expediente.cliente.fecha_ingreso %}Inicié mi relación laboral el día {{ expediente.cliente.fecha_ingreso|date:"d/m/Y" }},{% endif %} laborando en un horario{% if expediente.cliente.jornada %} de tipo {{ expediente.cliente.get_jornada_display|lower }}{% endif %}{% if expediente.cliente.horas_semanales %}, {{ expediente.cliente.horas_semanales }} horas a la semana{% endif %}, con un salario mensual de {% if expediente.cliente.salario %}${{ expediente.cliente.salario|floatformat:2 }}{% endif %}, mismo que se me pagaba de forma {{ expediente.cliente.get_periodo_pago_display|lower|default:"[período de pago]" }}.
+
+Por lo anterior, vengo a solicitar la intervención del Centro de Conciliación Laboral de Baja California, a efecto de que se cite a la parte patronal a una audiencia de conciliación y se logre el pago de las prestaciones que por derecho me corresponden.
+
+{% if expediente.folio %}Número de expediente de trámite: {{ expediente.folio }}{% endif %}
+        </div>
+    </div>
+
+    <!-- DATOS ADICIONALES -->
+    <div class="section-title">8. Información Adicional</div>
+    <div class="section-body">
+        <div class="field-row">
+            <div class="field-group">
+                <div class="field-label">¿Requiere traductor?</div>
+                <div class="field-value">No</div>
+            </div>
+            <div class="field-group">
+                <div class="field-label">¿Cuenta con discapacidad?</div>
+                <div class="field-value">No especificado</div>
+            </div>
+            <div class="field-group">
+                <div class="field-label">Asesor Asignado</div>
+                <div class="field-value">{{ expediente.asesor.get_full_name|default:expediente.asesor.username }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- FIRMA -->
+    <div class="signature-area">
+        <p style="font-size:9pt;margin-bottom:5px;">Firma del Solicitante</p>
+        <div class="signature-line">
+            {{ expediente.cliente.nombre }}
+        </div>
+        <p style="font-size:8pt;color:#666;margin-top:15px;">
+            Tijuana, Baja California, a {% now "d \d\e F \d\e Y" %}
+        </p>
+    </div>
+
+    <div class="footer-note">
+        <p>Documento generado el {% now "d/m/Y H:i" %} por {{ expediente.asesor.get_full_name|default:expediente.asesor.username }} | 
+        Expediente: {{ expediente.numero }} | Sistema de Gestión de Conciliacion Laboral Tijuana</p>
+        <p style="margin-top:2px;">Los datos personales recabados serán tratados de manera confidencial conforme a la legislación aplicable.</p>
+    </div>
+</body>
+</html>

@@ -82,4 +82,7 @@ urlpatterns = [
 
     # Subir PDF de conciliación (alternativa manual)
     path('expedientes/<int:pk>/subir-conciliacion/', views.subir_conciliacion_pdf, name='subir_conciliacion_pdf'),
+
+    # Descargar formulario de conciliación prellenado (PDF)
+    path('expedientes/<int:pk>/descargar-conciliacion/', views.descargar_conciliacion_pdf, name='descargar_conciliacion_pdf'),
 ]
