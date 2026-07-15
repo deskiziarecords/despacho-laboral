@@ -117,9 +117,77 @@
             <p class="text-sm text-gray-700 mt-1" style="background: #f5f6f7; padding: 8px;">{{ expediente.notas|linebreaks }}</p>
         </div>
         {% endif %}
-    </div>
+    </div>        <!-- Historial de Tareas de Conciliación Automática -->
+        {% if tareas_conciliacion %}
+        <div class="card" style="border-color: #1a6b3c;">
+            <div class="card-header" style="background: #1a6b3c; color: white; border-bottom: none;">
+                <span>🌐 Envíos al Portal de Conciliación</span>
+            </div>
+            <div class="card-body space-y-2">
+                {% for tarea in tareas_conciliacion %}
+                <div class="px-3 py-2" style="background: #f5f6f7; border: 1px solid #e8eaed;">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            {% if tarea.estado == 'completado' %}
+                            <span class="text-sm">✅</span>
+                            {% elif tarea.estado == 'fallido' %}
+                            <span class="text-sm">❌</span>
+                            {% elif tarea.estado == 'ejecutando' %}
+                            <span class="text-sm">🤖</span>
+                            {% else %}
+                            <span class="text-sm">⏳</span>
+                            {% endif %}
+                            <div>
+                                <p class="text-xs font-medium text-gray-800">
+                                    {% if tarea.estado == 'completado' %}
+                                    ✅ Envío exitoso — Folio: <strong>{{ tarea.folio|default:'N/A' }}</strong>
+                                    {% elif tarea.estado == 'fallido' %}
+                                    ❌ Error: {{ tarea.error|truncatechars:60 }}
+                                    {% elif tarea.estado == 'ejecutando' %}
+                                    🤖 En progreso...
+                                    {% else %}
+                                    ⏳ Pendiente
+                                    {% endif %}
+                                </p>
+                                <p class="text-[10px] text-gray-500">
+                                    {% if tarea.usuario %}
+                                    Iniciado por <strong>{{ tarea.usuario.get_full_name|default:tarea.usuario.username }}</strong> ·
+                                    {% endif %}
+                                    {{ tarea.created_at|date:"d/m/Y H:i" }}
+                                    {% if tarea.completed_at %}
+                                    · Completado {{ tarea.completed_at|date:"d/m/Y H:i" }}
+                                    · {{ tarea.tiempo_transcurrido }}
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-1.5">
+                            {% if tarea.estado == 'fallido' %}
+                            <a href="{% url 'reintentar_conciliacion' tarea.pk %}"
+                               class="btn btn-sm" style="background:#dc2626; color:white; padding: 2px 8px; font-size: 11px;">
+                                🔄 Reintentar
+                            </a>
+                            {% endif %}
+                            {% if tarea.estado == 'completado' and tarea.detalle %}
+                            <span class="text-[10px] text-gray-400" title="{{ tarea.detalle }}">📄</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if tarea.estado == 'fallido' and tarea.detalle %}
+                    <p class="text-[10px] text-red-500 mt-1 ml-7">{{ tarea.detalle }}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                <div class="text-center pt-2">
+                    <a href="{% url 'enviar_conciliacion_automation' expediente.pk %}" class="btn btn-sm" style="background:#1a6b3c; color:white;">
+                        🌐 Nuevo envío al portal
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
-    <!-- Cambio de Estado Rápido -->
+        <!-- Cambio de Estado Rápido -->
     {% if transiciones_posibles %}
     <div class="bg-white rounded shadow-sm border border-gray-200 p-4">
         <h2 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2"><img src="{% static 'svg/file-edit-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Cambiar Estado</h2>

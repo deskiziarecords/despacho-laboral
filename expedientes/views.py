@@ -372,6 +372,11 @@ class ExpedienteDetailView(LoginRequiredMixin, DetailView):
         context['transferencias'] = self.object.solicitudes_transferencia.select_related(
             'solicitante', 'resuelto_por', 'asesor_asignado'
         ).order_by('-created_at')
+
+        # Tareas de conciliación (últimas 5)
+        context['tareas_conciliacion'] = self.object.tareas_conciliacion.select_related(
+            'usuario'
+        ).order_by('-created_at')[:5]
         context['ESTADO_COLORS'] = ESTADO_COLORS
         return context
 
@@ -1976,3 +1981,52 @@ def conciliacion_procesando(request, task_pk):
         'expediente': task.expediente,
         'ESTADO_COLORS': ESTADO_COLORS,
     })
+
+
+@login_required
+def reintentar_conciliacion(request, task_pk):
+    """
+    Reintenta una tarea de conciliación fallida.
+    Crea una nueva tarea para el mismo expediente y la ejecuta en un hilo.
+    """
+    task_original = get_object_or_404(TareaConciliacion, pk=task_pk)
+
+    # Verificar que el usuario tenga acceso al expediente
+    expedientes_qs = get_expedientes_queryset(request.user)
+    expediente = get_object_or_404(expedientes_qs, pk=task_original.expediente.pk)
+
+    # Verificar datos mínimos
+    if not expediente.cliente.curp:
+        messages.error(request, 'El cliente debe tener CURP para enviar la solicitud de conciliación.')
+        return redirect('expediente_detail', pk=expediente.pk)
+
+    if not expediente.cliente.telefono:
+        messages.error(request, 'El cliente debe tener teléfono registrado.')
+        return redirect('expediente_detail', pk=expediente.pk)
+
+    # Evitar reintentos duplicados si ya hay una tarea en progreso
+    tarea_existente = expediente.tareas_conciliacion.filter(
+        estado__in=['pendiente', 'ejecutando']
+    ).first()
+    if tarea_existente:
+        messages.warning(request, 'Ya hay un envío en progreso para este expediente. Espera a que termine.')
+        return redirect('conciliacion_procesando', task_pk=tarea_existente.pk)
+
+    # Crear nueva tarea
+    task = TareaConciliacion.objects.create(
+        expediente=expediente,
+        usuario=request.user,
+        estado='pendiente',
+        modo=task_original.modo or 'automatico',
+    )
+
+    # Iniciar la ejecución en un hilo separado
+    hilo = threading.Thread(
+        target=_ejecutar_conciliacion_en_hilo,
+        args=(task.pk,),
+        daemon=True,
+    )
+    hilo.start()
+
+    messages.info(request, '🚀 Reintentando envío automático al portal de conciliación...')
+    return redirect('conciliacion_procesando', task_pk=task.pk)

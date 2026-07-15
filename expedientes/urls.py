@@ -78,4 +78,5 @@ urlpatterns = [
     path('expedientes/<int:pk>/conciliacion-automatica/', views.enviar_conciliacion_automation, name='enviar_conciliacion_automation'),
     path('conciliacion/<int:task_pk>/estado/', views.conciliacion_estado, name='conciliacion_estado'),
     path('conciliacion/<int:task_pk>/procesando/', views.conciliacion_procesando, name='conciliacion_procesando'),
+    path('conciliacion/<int:task_pk>/reintentar/', views.reintentar_conciliacion, name='reintentar_conciliacion'),
 ]
