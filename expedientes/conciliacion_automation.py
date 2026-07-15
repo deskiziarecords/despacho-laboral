@@ -645,63 +645,108 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                 for err in errores[:3]:
                     logger.warning('  Error: %s (campo: %s)', err['msg'], err['name'])
 
-            # Click "Enviar solicitud"
-            logger.info('[7a] Click en Enviar solicitud...')
-            _btn_click(page, 'enviar solicitud')
-            page.wait_for_timeout(2500)
-
-            # ═══ CRÍTICO ═══════════════════════════════════════════
-            # Click en "Enviar" (SweetAlert confirmación).
+            # ════════════════════════════════════════════════════════════
+            #  FASE 7: Envío de la solicitud con manejo de navegación
+            # ════════════════════════════════════════════════════════════
             #
-            # Este clic envía el formulario y el portal navega a una
-            # página de resultado. La navegación DESTRUYE el contexto
-            # de ejecución anterior.
+            # PROBLEMA: El portal navega a una nueva página al enviar
+            # el formulario (ya sea al hacer clic en "Enviar solicitud"
+            # o al confirmar con "Enviar"). La navegación DESTRUYE el
+            # contexto de JS anterior, causando el error:
+            #   "Execution context was destroyed"
             #
-            # Usamos expect_navigation() para:
-            #  1. Crear un watcher de navegación ANTES de hacer clic
-            #  2. Hacer clic (que dispara la navegación)
+            # SOLUCIÓN: Usar expect_navigation() para:
+            #  1. Crear un watcher de navegación ANTES de cualquier clic
+            #  2. Hacer los clicks que disparan la navegación
             #  3. Esperar a que la navegación termine completamente
             #
-            # Esto evita que page.evaluate() se ejecute sobre un
-            # contexto destruido.
-            # ═══════════════════════════════════════════════════════
-            logger.info('[7b] Confirmando envío con expect_navigation...')
-
-            # Primero intentar con Playwright nativo (no evaluate)
+            # El watcher cubre AMBOS clicks porque no sabemos cuál
+            # de ellos dispara la navegación (puede variar según el
+            # comportamiento actual del portal).
+            # ════════════════════════════════════════════════════════════
+            # ════════════════════════════════════════════════════════════
+            #  FASE 7: Envío con expect_navigation + SweetAlert selector
+            # ════════════════════════════════════════════════════════════
+            #
+            # ESTRATEGIA:
+            #  1. expect_navigation() se activa ANTES de cualquier clic
+            #  2. Se espera el SweetAlert específicamente (no timeout ciego)
+            #  3. Se usa SOLO Playwright nativo para el clic (no evaluate)
+            #  4. Si no hay SweetAlert, se asume que ya navegó
+            #  5. Se detecta navegación comparando URLs
+            # ════════════════════════════════════════════════════════════
+            logger.info('[7] Iniciando envío con expect_navigation...')
             navegacion_completa = False
+            url_inicial = page.url
+
+            # 7a: Click "Enviar solicitud" - FUERA del expect_navigation
+            # porque puede o no disparar navegación (SweetAlert puede aparecer antes)
+            logger.info('[7a] Click en Enviar solicitud...')
+            _btn_click(page, 'enviar solicitud')
+
+            # Esperar SweetAlert por máximo 1.5s (si no aparece, el envío es directo)
             try:
-                with page.expect_navigation(timeout=25000):
-                    # Intentar clic nativo primero
+                page.wait_for_selector('.swal-overlay, .swal-modal, .modal.show', timeout=1500)
+                logger.info('[7a] SweetAlert detectado')
+                page.wait_for_timeout(300)
+            except Exception:
+                logger.info('[7a] Sin SweetAlert - navegación directa')
+
+            try:
+                with page.expect_navigation(timeout=45000):
+                    # 7b: Click "Enviar" (SweetAlert confirmación, si existe)
+                    # Solo Playwright nativo - NUNCA evaluate aquí
+                    # click(timeout=5000) espera hasta 5s a que aparezca el botón
+                    logger.info('[7b] Click en confirmar (nativo, timeout 5s)...')
                     btn_envio = page.locator('button').filter(
                         has_text=re.compile(r'enviar', re.IGNORECASE)
                     ).or_(
                         page.locator('.swal-button--confirm, .confirm-button, button.swal-button')
                     ).first
-                    if btn_envio.count():
-                        btn_envio.click(timeout=10000)
-                    else:
-                        # Fallback: buscar cualquier botón visible
-                        _btn_click(page, 'enviar')
+                    try:
+                        btn_envio.click(timeout=5000)
+                        logger.info('[7b] Confirmación enviada')
+                    except Exception:
+                        logger.info('[7b] Sin confirmación - navegación directa o sin SweetAlert')
+
                 navegacion_completa = True
-                logger.info('[7b] Navegación detectada y completada')
+                logger.info('[7] Navegación detectada! URL: %s → %s', url_inicial, page.url)
             except Exception as nav_err:
-                logger.warning('[7b] expect_navigation falló: %s', nav_err)
-                # Verificar si ya estamos en una URL diferente
-                url_actual = page.url
-                logger.info('[7b] URL actual después del intento: %s', url_actual)
+                logger.warning('[7] expect_navigation falló: %s', nav_err)
+                # Detectar si navegó a pesar del error
+                try:
+                    url_actual = page.url
+                    if url_actual and url_actual != url_inicial:
+                        logger.info('[7] Navegación detectada por cambio de URL: %s', url_actual)
+                        navegacion_completa = True
+                    else:
+                        logger.info('[7] URL sin cambios: %s', url_actual)
+                except Exception:
+                    logger.warning('[7] No se pudo obtener URL')
 
             if not navegacion_completa:
-                # Fallback: intentar de nuevo con timeout
+                logger.info('[7] Fallback: esperando carga de página...')
                 try:
                     page.wait_for_load_state('networkidle', timeout=10000)
-                    logger.info('[7b] load_state completado (fallback)')
+                    logger.info('[7] load_state completado (fallback)')
                 except Exception:
                     page.wait_for_timeout(3000)
+                try:
+                    if page.url != url_inicial:
+                        navegacion_completa = True
+                        logger.info('[7] Navegación confirmada en fallback: %s', page.url)
+                except Exception:
+                    pass
 
-            # Pequeña pausa para que el DOM termine de renderizar
+            # Asegurar que el DOM de la nueva página esté listo
+            try:
+                page.wait_for_load_state('domcontentloaded', timeout=10000)
+            except Exception:
+                pass
+
             page.wait_for_timeout(1000)
 
-            # Cerrar modal de éxito (ahora en la NUEVA página)
+            # Cerrar modal de éxito (ahora en la NUEVA página si navegó)
             _cerrar_modales(page)
             page.wait_for_timeout(500)
             checkpoint('07_enviado')
