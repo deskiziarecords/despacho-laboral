@@ -45,6 +45,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrandr2 \
     libgbm1 \
     libasound2 \
+    libxshmfence1 \
+    libx11-xcb1 \
+    libgtk-3-0 \
+    libegl1 \
+    libwayland-client0 \
+    libwayland-egl1 \
+    libwayland-cursor0 \
     && rm -rf /var/lib/apt/lists/*
 
 # ================================================
@@ -63,7 +70,8 @@ RUN uv sync --frozen --no-dev --no-install-project
 # ================================================
 # 4. Instalar Chromium para Playwright
 # ================================================
-RUN uv run playwright install chromium
+RUN uv run playwright install chromium && \
+    uv run playwright install-deps chromium
 
 # ================================================
 # 5. Copiar código de la aplicación y script de inicio
