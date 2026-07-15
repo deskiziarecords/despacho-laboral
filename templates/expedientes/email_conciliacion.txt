@@ -1,0 +1,23 @@
+{% load i18n %}Sistema de Conciliacion Laboral Tijuana - Notificación de Envío{% autoescape off %}
+
+Hola {{ usuario_nombre }},
+
+El envío automático al portal de conciliación para el expediente {{ expediente_numero }} ha {{ resultado }}.
+
+📋 Expediente: {{ expediente_numero }}
+👤 Cliente: {{ cliente_nombre }}
+⏱️ Tiempo: {{ tiempo_total }}
+📅 Iniciado: {{ fecha_inicio }}
+
+{% if folio %}✅ Folio generado: {{ folio }}{% endif %}
+{% if error %}❌ Error: {{ error }}{% endif %}
+{% if detalle %}📝 Detalle: {{ detalle }}{% endif %}
+
+Puedes ver los detalles completos en el expediente:
+{{ expediente_url }}
+
+---
+
+Saludos,
+Sistema de Gestión de Conciliacion Laboral Tijuana
+{% endautoescape %}
