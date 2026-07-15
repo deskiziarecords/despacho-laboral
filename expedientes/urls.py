@@ -79,4 +79,7 @@ urlpatterns = [
     path('conciliacion/<int:task_pk>/estado/', views.conciliacion_estado, name='conciliacion_estado'),
     path('conciliacion/<int:task_pk>/procesando/', views.conciliacion_procesando, name='conciliacion_procesando'),
     path('conciliacion/<int:task_pk>/reintentar/', views.reintentar_conciliacion, name='reintentar_conciliacion'),
+
+    # Subir PDF de conciliación (alternativa manual)
+    path('expedientes/<int:pk>/subir-conciliacion/', views.subir_conciliacion_pdf, name='subir_conciliacion_pdf'),
 ]

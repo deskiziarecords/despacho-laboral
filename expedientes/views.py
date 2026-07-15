@@ -31,6 +31,28 @@ from .models import (Cliente, Documento, Expediente, Movimiento, Nota,
                       CalculoLaboral, LegalConfig, Aviso,
                       SolicitudTransferencia, Notificacion)
 from .signals import registrar_movimiento
+
+
+def _extraer_folio_pdf(nombre_archivo, contenido_bytes=None):
+    """
+    Extrae el folio de conciliación del nombre del PDF o su contenido.
+    Busca patrones como CCL-2024-12345, 2024-12345, folio_12345.
+    """
+    import re
+    for patron in [r'(CCL[\s/-][\w\-/.]+)', r'(\d{4}[\s-]\d{3,6})', r'(folio[\s_:.-]*[\w\-]+)']:
+        match = re.search(patron, nombre_archivo, re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+    if contenido_bytes:
+        try:
+            texto = contenido_bytes.decode('latin-1', errors='ignore')
+            for patron in [r'(CCL[\s/-][\w\-/.]+)', r'(\d{4}[\s-]\d{3,6})']:
+                match = re.search(patron, texto, re.IGNORECASE)
+                if match:
+                    return match.group(1).strip()
+        except Exception:
+            pass
+    return None
 from .whatsapp import (enviar_whatsapp, generar_deep_link, renderizar_plantilla,
                         MENSAJES_TEMPLATE)
 from .laboral_calculator import calcular_desde_expediente, recalcular_calculo
@@ -2030,3 +2052,69 @@ def reintentar_conciliacion(request, task_pk):
 
     messages.info(request, '🚀 Reintentando envío automático al portal de conciliación...')
     return redirect('conciliacion_procesando', task_pk=task.pk)
+
+
+
+@login_required
+def subir_conciliacion_pdf(request, pk):
+    """
+    Permite al usuario subir manualmente un PDF de conciliación descargado
+    desde el portal del gobierno. Extrae el folio del PDF y actualiza el expediente.
+    """
+    expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
+
+    if request.method == 'POST' and request.FILES.get('pdf'):
+        pdf_file = request.FILES['pdf']
+
+        if not pdf_file.name.lower().endswith('.pdf'):
+            messages.error(request, 'Solo se aceptan archivos PDF.')
+            return redirect('expediente_detail', pk=expediente.pk)
+
+        # Extraer folio del nombre del archivo o contenido
+        contenido_bytes = pdf_file.read()
+        folio = _extraer_folio_pdf(pdf_file.name, contenido_bytes)
+        pdf_file.seek(0)  # Reset file pointer for saving
+
+        # Guardar como Documento
+        from .models import Documento as DocModel
+        from django.core.files.base import ContentFile
+        doc = DocModel(
+            expediente=expediente,
+            descripcion=f'Acuse de Conciliación - Folio: {folio or "Pendiente"}',
+            tipo='citatorio',
+            subido_por=request.user,
+        )
+        doc.archivo.save(pdf_file.name, ContentFile(contenido_bytes), save=True)
+
+        # Actualizar expediente con el folio
+        if folio:
+            expediente.folio = folio
+            expediente.fecha_tramite = timezone.now().date()
+            expediente.save()
+
+        # Crear TareaConciliacion como completada
+        TareaConciliacion.objects.create(
+            expediente=expediente,
+            usuario=request.user,
+            estado='completado',
+            folio=folio or '',
+            detalle=f'PDF subido manualmente. Folio: {folio or "No detectado"}.',
+            modo='automatico',
+            completed_at=timezone.now(),
+        )
+
+        registrar_movimiento(
+            expediente=expediente,
+            usuario=request.user,
+            accion='actualizacion',
+            detalle=f'PDF de conciliación subido manualmente. Folio: {folio or "No detectado"}'
+        )
+
+        if folio:
+            messages.success(request, f'✅ PDF de conciliación registrado. Folio: {folio}')
+        else:
+            messages.warning(request, 'PDF guardado pero no se pudo detectar el folio. Puedes capturarlo manualmente en Editar Expediente.')
+
+        return redirect('expediente_detail', pk=expediente.pk)
+
+    return redirect('expediente_detail', pk=expediente.pk)

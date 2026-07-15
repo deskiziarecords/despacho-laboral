@@ -22,7 +22,28 @@
                 <a href="{% url 'calculo_laboral' expediente.pk %}" class="btn" style="background:#47505e; color:white; border-color:#36404f;"><img src="{% static 'svg/calculator.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Cálculos</a>
                 <a href="{% url 'whatsapp_enviar' expediente.pk %}" class="btn btn-success"><img src="{% static 'svg/whatsapp.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> WhatsApp</a>
                 <a href="{% url 'solicitud_conciliacion' expediente.pk %}" class="btn" style="background:#47505e; color:white; border-color:#36404f;"><img src="{% static 'svg/file-document-multiple-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Solicitud</a>
-                <a href="{% url 'enviar_conciliacion_automation' expediente.pk %}" class="btn" style="background:#1a6b3c; color:white; border-color:#145530;">🌐 Enviar a Conciliación</a>
+                <div class="relative inline-block">
+                    <button onclick="this.nextElementSibling.classList.toggle('hidden')" class="btn" style="background:#1a6b3c; color:white; border-color:#145530;">🌐 Conciliación ▾</button>
+                    <div class="hidden absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-200 z-50 min-w-[250px] py-1" style="box-shadow: 0 10px 25px rgba(0,0,0,0.15);">
+                        <a href="{% url 'enviar_conciliacion_automation' expediente.pk %}" class="block px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition flex items-center gap-2">
+                            🤖 Envío Automático
+                            <span class="text-[10px] text-gray-400 ml-auto">(Playwright)</span>
+                        </a>
+                        <div class="border-t border-gray-100 my-1"></div>
+                        <div class="px-4 py-2.5">
+                            <form method="post" action="{% url 'subir_conciliacion_pdf' expediente.pk %}" enctype="multipart/form-data" class="space-y-2">
+                                {% csrf_token %}
+                                <label class="block text-xs font-medium text-gray-600">📄 Subir PDF Manual</label>
+                                <input type="file" name="pdf" accept=".pdf" required
+                                       class="w-full text-xs px-2 py-1.5 border border-gray-300 rounded-lg file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:text-xs hover:file:bg-blue-100">
+                                <button type="submit" class="w-full px-3 py-1.5 bg-blue-700 text-white rounded-lg text-xs font-semibold hover:bg-blue-800 transition">
+                                    📥 Subir Acuse y Extraer Folio
+                                </button>
+                                <p class="text-[10px] text-gray-400 leading-tight">Descarga el PDF del portal de conciliación y súbelo aquí para extraer el folio automáticamente.</p>
+                            </form>
+                        </div>
+                    </div>
+                </div>
                 {% if user.profile.rol == 'admin' or user.profile.rol == 'superadmin' or user.profile.puede_generar_documentos %}
                 <a href="{% url 'machotes_listar' expediente.pk %}" class="btn btn-success"><img src="{% static 'svg/file-document-multiple-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Documentos</a>
                 <a href="{% url 'demanda_editor' expediente.pk %}" class="btn" style="background:#47505e; color:white; border-color:#36404f;"><img src="{% static 'svg/file-edit-outline.svg' %}" class="w-3.5 h-3.5" style="filter: brightness(0) invert(1);"> Demanda</a>
