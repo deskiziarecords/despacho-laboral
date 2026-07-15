@@ -837,3 +837,205 @@ class PartnerLoan(models.Model):
         if self.estado == 'pendiente':
             return self.monto
         return 0
+
+
+class ProfitDistribution(models.Model):
+    """
+    Distribución de utilidades generada a partir de un convenio.
+
+    Calcula automáticamente: Ingresos - Honorarios - Comisiones - Retenciones - Gastos = Utilidad Neta
+    Luego distribuye la utilidad neta entre los socios según su porcentaje de participación.
+    """
+
+    ESTADO_CHOICES = [
+        ('borrador', 'Borrador'),
+        ('distribuida', 'Distribuida'),
+        ('confirmada', 'Confirmada'),
+        ('cancelada', 'Cancelada'),
+    ]
+
+    convenio = models.ForeignKey(
+        'Agreement', on_delete=models.PROTECT,
+        verbose_name='Convenio',
+        related_name='distribuciones',
+        help_text='Convenio que genera la distribución'
+    )
+    fecha = models.DateField('Fecha de distribución')
+    descripcion = models.CharField('Descripción', max_length=300, blank=True,
+                                    help_text='Breve descripción de la distribución')
+
+    # Cálculos automáticos (se llenan al crear la distribución)
+    monto_convenio = models.DecimalField('Monto del convenio', max_digits=12, decimal_places=2, editable=False)
+    honorarios = models.DecimalField('Honorarios', max_digits=12, decimal_places=2, editable=False, default=0)
+    comisiones = models.DecimalField('Comisiones', max_digits=12, decimal_places=2, editable=False, default=0)
+    retenciones = models.DecimalField('Retenciones / ISR', max_digits=12, decimal_places=2, default=0,
+                                       help_text='Retenciones fiscales aplicables')
+    gastos_relacionados = models.DecimalField('Gastos relacionados', max_digits=12, decimal_places=2, default=0,
+                                               help_text='Gastos operativos relacionados al convenio')
+    utilidad_neta = models.DecimalField('Utilidad Neta', max_digits=12, decimal_places=2, editable=False, default=0)
+
+    estado = models.CharField('Estado', max_length=15, choices=ESTADO_CHOICES, default='borrador')
+    notas = models.TextField('Notas', blank=True)
+
+    # Auditoría
+    creado_por = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        verbose_name='Creado por',
+        related_name='distribuciones_creadas'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Distribución de Utilidad'
+        verbose_name_plural = 'Distribuciones de Utilidades'
+        ordering = ['-fecha', '-created_at']
+        indexes = [
+            models.Index(fields=['fecha']),
+            models.Index(fields=['estado']),
+            models.Index(fields=['convenio', 'estado']),
+        ]
+
+    def __str__(self):
+        return f'Distribución #{self.pk} - {self.convenio.cliente.nombre} - ${self.utilidad_neta:,.2f}'
+
+    def calcular(self):
+        """
+        Calcula la utilidad neta basada en el convenio y datos relacionados.
+        No guarda en BD, solo actualiza los campos en memoria.
+        """
+        self.monto_convenio = self.convenio.monto_convenio
+
+        # Honorarios del convenio
+        self.honorarios = self.convenio.honorarios or 0
+
+        # Comisiones: buscar comisiones relacionadas al expediente del convenio
+        from django.db.models import Sum
+        com = Commission.objects.filter(
+            expediente__cliente=self.convenio.cliente
+        ).aggregate(t=Sum('monto_comision'))['t'] or 0
+        self.comisiones = com
+
+        # Utilidad neta
+        self.utilidad_neta = self.monto_convenio - self.honorarios - self.comisiones - self.retenciones - self.gastos_relacionados
+
+    def save(self, *args, **kwargs):
+        self.calcular()
+        super().save(*args, **kwargs)
+
+    @property
+    def distribucion_partners(self):
+        """Retorna el queryset de las participaciones de socios."""
+        return self.partner_profits.select_related('partner').order_by('partner__nombre')
+
+    @property
+    def total_distribuido(self):
+        """Suma de lo distribudo a todos los socios."""
+        return self.partner_profits.aggregate(t=models.Sum('monto'))['t'] or 0
+
+
+class PartnerProfit(models.Model):
+    """
+    Participación individual de un socio en una distribución de utilidades.
+
+    Se genera automáticamente al crear una distribución.
+    """
+
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente de pago'),
+        ('pagado', 'Pagado'),
+        ('cancelado', 'Cancelado'),
+    ]
+
+    distribucion = models.ForeignKey(
+        'ProfitDistribution', on_delete=models.CASCADE,
+        verbose_name='Distribución',
+        related_name='partner_profits'
+    )
+    partner = models.ForeignKey(
+        'Partner', on_delete=models.PROTECT,
+        verbose_name='Socio',
+        related_name='utilidades'
+    )
+    porcentaje = models.DecimalField(
+        '% aplicado', max_digits=5, decimal_places=2,
+        help_text='Porcentaje de participación del socio en esta distribución'
+    )
+    monto = models.DecimalField(
+        'Monto', max_digits=12, decimal_places=2,
+        help_text='Monto calculado: utilidad_neta × porcentaje ÷ 100'
+    )
+    estado = models.CharField(
+        'Estado', max_length=15,
+        choices=ESTADO_CHOICES, default='pendiente'
+    )
+    fecha_pago = models.DateField('Fecha de pago', null=True, blank=True)
+    notas = models.TextField('Notas', blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Participación de Socio'
+        verbose_name_plural = 'Participaciones de Socios'
+        ordering = ['partner__nombre']
+        unique_together = ['distribucion', 'partner']
+        indexes = [
+            models.Index(fields=['estado']),
+            models.Index(fields=['partner', 'estado']),
+        ]
+
+    def __str__(self):
+        return f'{self.partner.nombre}: ${self.monto:,.2f} ({self.porcentaje}%)'
+
+    def save(self, *args, **kwargs):
+        # Si es nuevo y no tiene monto, calcularlo automáticamente
+        if not self.pk or not self.monto:
+            self.monto = self.distribucion.utilidad_neta * self.porcentaje / 100
+        super().save(*args, **kwargs)
+
+
+class PartnerUtilitySummary(models.Model):
+    """
+    Resumen de utilidades acumuladas por socio.
+    Se actualiza automáticamente cuando se confirma una distribución.
+    """
+
+    partner = models.OneToOneField(
+        'Partner', on_delete=models.PROTECT,
+        verbose_name='Socio',
+        related_name='resumen_utilidades'
+    )
+    utilidad_generada = models.DecimalField(
+        'Utilidad generada', max_digits=14, decimal_places=2, default=0,
+        help_text='Total de utilidad generada en distribuciones'
+    )
+    utilidad_pagada = models.DecimalField(
+        'Utilidad pagada', max_digits=14, decimal_places=2, default=0,
+        help_text='Total de utilidad que ya se le ha pagado al socio'
+    )
+    utilidad_pendiente = models.DecimalField(
+        'Utilidad pendiente', max_digits=14, decimal_places=2, default=0,
+        help_text='Utilidad generada pendiente de pago'
+    )
+    ultima_actualizacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Resumen de Utilidades del Socio'
+        verbose_name_plural = 'Resúmenes de Utilidades de Socios'
+        ordering = ['partner__nombre']
+
+    def __str__(self):
+        return f'{self.partner.nombre} - G: ${self.utilidad_generada:,.2f} / P: ${self.utilidad_pagada:,.2f}'
+
+    def actualizar(self):
+        """Actualiza los totales desde las distribuciones confirmadas."""
+        from django.db.models import Sum
+        profits = PartnerProfit.objects.filter(
+            partner=self.partner,
+            distribucion__estado__in=['distribuida', 'confirmada']
+        )
+        self.utilidad_generada = profits.aggregate(t=Sum('monto'))['t'] or 0
+        self.utilidad_pagada = profits.filter(estado='pagado').aggregate(t=Sum('monto'))['t'] or 0
+        self.utilidad_pendiente = self.utilidad_generada - self.utilidad_pagada
+        self.save()

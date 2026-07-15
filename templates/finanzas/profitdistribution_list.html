@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Distribución de Utilidades - Finanzas{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <!-- Header -->
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <h1 class="text-2xl font-bold text-gray-800">📊 Distribución de Utilidades</h1>
+        <a href="{% url 'profitdistribution_create' %}" class="btn" style="background:#1a6b3c;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;">
+            ➕ Nueva Distribución
+        </a>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div class="text-xs text-gray-500 uppercase tracking-wide font-semibold">Total Distribuciones</div>
+            <div class="text-2xl font-bold text-gray-800 mt-1">{{ total_distribuciones }}</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div class="text-xs text-gray-500 uppercase tracking-wide font-semibold">Monto Convenios</div>
+            <div class="text-2xl font-bold text-green-700 mt-1">${{ total_monto_convenio|floatformat:0 }}</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div class="text-xs text-gray-500 uppercase tracking-wide font-semibold">Honorarios + Comisiones</div>
+            <div class="text-2xl font-bold text-blue-700 mt-1">${{ total_honorarios|add:total_comisiones|floatformat:0 }}</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div class="text-xs text-gray-500 uppercase tracking-wide font-semibold">Utilidad Neta Total</div>
+            <div class="text-2xl font-bold text-amber-600 mt-1">${{ total_utilidad|floatformat:0 }}</div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+        <form method="get" class="flex flex-wrap items-end gap-3">
+            <div>
+                <label class="block text-xs font-semibold text-gray-600 mb-1">Estado</label>
+                <select name="estado" class="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Todos</option>
+                    {% for key, label in estado_choices %}
+                        <option value="{{ key }}" {% if filtros.estado == key %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="px-4 py-2 bg-gray-700 text-white rounded-lg text-sm font-semibold hover:bg-gray-800 transition">Filtrar</button>
+            {% if filtros %}<a href="{% url 'profitdistribution_list' %}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold hover:bg-gray-300 transition">Limpiar</a>{% endif %}
+        </form>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600 uppercase text-xs font-semibold">
+                    <tr>
+                        <th class="px-4 py-3 text-left">#</th>
+                        <th class="px-4 py-3 text-left">Fecha</th>
+                        <th class="px-4 py-3 text-left">Cliente</th>
+                        <th class="px-4 py-3 text-right">Monto Convenio</th>
+                        <th class="px-4 py-3 text-right">Honorarios</th>
+                        <th class="px-4 py-3 text-right">Comisiones</th>
+                        <th class="px-4 py-3 text-right font-bold text-green-700">Utilidad Neta</th>
+                        <th class="px-4 py-3 text-center">Estado</th>
+                        <th class="px-4 py-3 text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for d in distribuciones %}
+                    <tr class="hover:bg-gray-50 transition">
+                        <td class="px-4 py-3 font-mono text-gray-500">#{{ d.pk }}</td>
+                        <td class="px-4 py-3 whitespace-nowrap">{{ d.fecha|date:"d/m/Y" }}</td>
+                        <td class="px-4 py-3 font-medium text-gray-800">{{ d.convenio.cliente.nombre }}</td>
+                        <td class="px-4 py-3 text-right font-mono">${{ d.monto_convenio|floatformat:2 }}</td>
+                        <td class="px-4 py-3 text-right font-mono text-blue-600">${{ d.honorarios|floatformat:2 }}</td>
+                        <td class="px-4 py-3 text-right font-mono text-purple-600">${{ d.comisiones|floatformat:2 }}</td>
+                        <td class="px-4 py-3 text-right font-mono font-bold text-green-700">${{ d.utilidad_neta|floatformat:2 }}</td>
+                        <td class="px-4 py-3 text-center">
+                            {% if d.estado == 'confirmada' %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">✅ Confirmada</span>
+                            {% elif d.estado == 'distribuida' %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">📊 Distribuida</span>
+                            {% elif d.estado == 'cancelada' %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">❌ Cancelada</span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">📝 Borrador</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <div class="flex items-center justify-center gap-2">
+                                <a href="{% url 'profitdistribution_detail' d.pk %}" class="text-blue-600 hover:text-blue-800 font-medium text-xs" title="Ver detalle">👁️</a>
+                                {% if d.estado == 'borrador' %}
+                                <a href="{% url 'profitdistribution_update' d.pk %}" class="text-amber-600 hover:text-amber-800 font-medium text-xs" title="Editar">✏️</a>
+                                <a href="{% url 'profitdistribution_confirmar' d.pk %}" class="text-green-600 hover:text-green-800 font-medium text-xs" title="Confirmar">✅</a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="px-4 py-8 text-center text-gray-500">
+                            <div class="text-3xl mb-2">📊</div>
+                            <p>No hay distribuciones de utilidades aún.</p>
+                            <a href="{% url 'profitdistribution_create' %}" class="text-blue-600 hover:underline font-medium mt-2 inline-block">Crear la primera distribución →</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <div class="flex items-center justify-between bg-white rounded-xl shadow-sm border border-gray-200 p-3">
+        <div class="text-sm text-gray-600">
+            Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+        </div>
+        <div class="flex gap-2">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% for k,v in filtros.items %}&{{ k }}={{ v }}{% endfor %}" class="px-3 py-1.5 bg-gray-200 rounded-lg text-sm hover:bg-gray-300 transition">← Anterior</a>
+            {% endif %}
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% for k,v in filtros.items %}&{{ k }}={{ v }}{% endfor %}" class="px-3 py-1.5 bg-gray-700 text-white rounded-lg text-sm hover:bg-gray-800 transition">Siguiente →</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

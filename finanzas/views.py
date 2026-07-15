@@ -6,14 +6,14 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import User
 from django.db.models import Sum, Q, Count
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import redirect
+from django.shortcuts import redirect, get_object_or_404
 from django.utils import timezone
 from django.urls import reverse_lazy
 from django.views.generic import TemplateView, ListView, CreateView, UpdateView, DeleteView, DetailView
 from django.contrib import messages
 
-from .models import SettlementPayment, Expense, Commission, CashMovement, Office, Payroll, Partner, WorkWeek, PartnerLoan, Agreement, Honorario
-from .forms import CashMovementForm, PartnerForm, WorkWeekForm, PartnerLoanForm, AgreementForm, HonorarioForm
+from .models import SettlementPayment, Expense, Commission, CashMovement, Office, Payroll, Partner, WorkWeek, PartnerLoan, Agreement, Honorario, ProfitDistribution, PartnerProfit, PartnerUtilitySummary
+from .forms import CashMovementForm, PartnerForm, WorkWeekForm, PartnerLoanForm, AgreementForm, HonorarioForm, ProfitDistributionForm
 from expedientes.models import Expediente
 
 
@@ -998,3 +998,154 @@ def exportar_dashboard_financiero_excel(request):
     except Exception as e:
         logger.exception("Error exportando dashboard financiero")
         return HttpResponse(f'Error al generar el Excel: {e}', status=500)
+
+
+# ─── CRUD Distribución de Utilidades ───────────────────────────────────────
+
+
+def _generar_participaciones(distribucion):
+    """
+    Helper: genera/actualiza las participaciones de cada socio activo
+    para una distribución dada.
+    """
+    partners = Partner.objects.filter(activo=True)
+    for partner in partners:
+        monto = distribucion.utilidad_neta * partner.porcentaje_participacion / 100
+        PartnerProfit.objects.update_or_create(
+            distribucion=distribucion,
+            partner=partner,
+            defaults={
+                'porcentaje': partner.porcentaje_participacion,
+                'monto': monto,
+            }
+        )
+
+
+class ProfitDistributionListView(LoginRequiredMixin, AdminOrSuperOnlyMixin, ListView):
+    model = ProfitDistribution
+    template_name = 'finanzas/profitdistribution_list.html'
+    context_object_name = 'distribuciones'
+    paginate_by = 20
+
+    def get_queryset(self):
+        qs = ProfitDistribution.objects.select_related(
+            'convenio__cliente', 'creado_por'
+        ).order_by('-fecha', '-created_at')
+
+        estado = self.request.GET.get('estado', '')
+        if estado:
+            qs = qs.filter(estado=estado)
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['estado_choices'] = ProfitDistribution.ESTADO_CHOICES
+        context['filtros'] = {k: v for k, v in self.request.GET.items() if v and k != 'page'}
+
+        qs = self.get_queryset()
+        totales = qs.aggregate(
+            total_monto_convenio=models.Sum('monto_convenio'),
+            total_utilidad=models.Sum('utilidad_neta'),
+            total_honorarios=models.Sum('honorarios'),
+            total_comisiones=models.Sum('comisiones'),
+        )
+        context['total_monto_convenio'] = totales['total_monto_convenio'] or 0
+        context['total_utilidad'] = totales['total_utilidad'] or 0
+        context['total_honorarios'] = totales['total_honorarios'] or 0
+        context['total_comisiones'] = totales['total_comisiones'] or 0
+        context['total_distribuciones'] = qs.count()
+
+        return context
+
+
+class ProfitDistributionCreateView(LoginRequiredMixin, AdminOrSuperOnlyMixin, CreateView):
+    model = ProfitDistribution
+    form_class = ProfitDistributionForm
+    template_name = 'finanzas/profitdistribution_form.html'
+    success_url = reverse_lazy('profitdistribution_list')
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        convenio_id = self.request.GET.get('convenio')
+        if convenio_id:
+            try:
+                kwargs['initial'] = {'convenio': int(convenio_id)}
+            except (ValueError, TypeError):
+                pass
+        return kwargs
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial['fecha'] = timezone.now().date()
+        return initial
+
+    def form_valid(self, form):
+        form.instance.creado_por = self.request.user
+        response = super().form_valid(form)
+        # Generar participaciones automáticamente
+        _generar_participaciones(self.object)
+        # Actualizar resúmenes de socios
+        for pp in self.object.partner_profits.all():
+            resumen, _ = PartnerUtilitySummary.objects.get_or_create(partner=pp.partner)
+            resumen.actualizar()
+        messages.success(
+            self.request,
+            f'✅ Distribución creada. Utilidad neta: ${self.object.utilidad_neta:,.2f}. '
+            f'Se generaron {self.object.partner_profits.count()} participaciones.'
+        )
+        return response
+
+
+class ProfitDistributionDetailView(LoginRequiredMixin, AdminOrSuperOnlyMixin, DetailView):
+    model = ProfitDistribution
+    template_name = 'finanzas/profitdistribution_detail.html'
+    context_object_name = 'distribucion'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['participaciones'] = self.object.partner_profits.select_related('partner').order_by('-monto')
+        context['total_distribuido'] = self.object.total_distribuido
+        context['partners_activos'] = Partner.objects.filter(activo=True)
+        return context
+
+
+class ProfitDistributionUpdateView(LoginRequiredMixin, AdminOrSuperOnlyMixin, UpdateView):
+    model = ProfitDistribution
+    form_class = ProfitDistributionForm
+    template_name = 'finanzas/profitdistribution_form.html'
+    success_url = reverse_lazy('profitdistribution_list')
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        # Recalcular participaciones
+        _generar_participaciones(self.object)
+        messages.success(self.request, '✅ Distribución actualizada. Las participaciones se recalcularon.')
+        return response
+
+
+@login_required
+def distribucion_confirmar(request, pk):
+    """Confirma una distribución y actualiza resúmenes de socios."""
+    if not hasattr(request.user, 'profile') or request.user.profile.rol not in ['admin', 'superadmin']:
+        messages.error(request, 'No tienes permiso para confirmar distribuciones.')
+        return redirect('profitdistribution_list')
+
+    dist = get_object_or_404(ProfitDistribution, pk=pk)
+    dist.estado = 'confirmada'
+    dist.save()
+
+    # Actualizar resúmenes de socios
+    for pp in dist.partner_profits.all():
+        resumen, _ = PartnerUtilitySummary.objects.get_or_create(partner=pp.partner)
+        resumen.actualizar()
+
+    messages.success(request, f'✅ Distribución #{dist.pk} confirmada. Utilidades registradas para los socios.')
+    return redirect('profitdistribution_detail', pk=pk)
+
+

@@ -37,4 +37,10 @@ urlpatterns = [
     # CRUD Honorarios
     path('honorarios/nuevo/', views.HonorarioCreateView.as_view(), name='honorario_create'),
     path('honorarios/<int:pk>/editar/', views.HonorarioUpdateView.as_view(), name='honorario_update'),
+    # CRUD Distribución de Utilidades
+    path('distribuciones/', views.ProfitDistributionListView.as_view(), name='profitdistribution_list'),
+    path('distribuciones/nuevo/', views.ProfitDistributionCreateView.as_view(), name='profitdistribution_create'),
+    path('distribuciones/<int:pk>/', views.ProfitDistributionDetailView.as_view(), name='profitdistribution_detail'),
+    path('distribuciones/<int:pk>/editar/', views.ProfitDistributionUpdateView.as_view(), name='profitdistribution_update'),
+    path('distribuciones/<int:pk>/confirmar/', views.distribucion_confirmar, name='profitdistribution_confirmar'),
 ]

@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}{% if form.instance.pk %}Editar Distribución{% else %}Nueva Distribución{% endif %} - Finanzas{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="flex items-center gap-3 mb-6">
+        <a href="{% url 'profitdistribution_list' %}" class="text-gray-500 hover:text-gray-700 transition text-xl">←</a>
+        <h1 class="text-2xl font-bold text-gray-800">
+            {% if form.instance.pk %}✏️ Editar Distribución{% else %}📊 Nueva Distribución de Utilidades{% endif %}
+        </h1>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                {{ form.non_field_errors }}
+            </div>
+            {% endif %}
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">{{ form.convenio.label }}</label>
+                    {{ form.convenio }}
+                    {% if form.convenio.errors %}<p class="text-red-500 text-xs mt-1">{{ form.convenio.errors }}</p>{% endif %}
+                    {% if not form.instance.pk %}
+                    <p class="text-xs text-gray-500 mt-1">Solo se muestran convenios firmados, pagados o parciales.</p>
+                    {% endif %}
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">{{ form.fecha.label }}</label>
+                    {{ form.fecha }}
+                    {% if form.fecha.errors %}<p class="text-red-500 text-xs mt-1">{{ form.fecha.errors }}</p>{% endif %}
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">{{ form.descripcion.label }}</label>
+                {{ form.descripcion }}
+                {% if form.descripcion.errors %}<p class="text-red-500 text-xs mt-1">{{ form.descripcion.errors }}</p>{% endif %}
+            </div>
+
+            <div class="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg text-sm">
+                💡 <strong>Cálculo automático:</strong> Al guardar, el sistema calculará:
+                <ul class="list-disc ml-5 mt-1 space-y-0.5">
+                    <li>Honorarios del convenio</li>
+                    <li>Comisiones relacionadas al cliente</li>
+                    <li>Utilidad Neta = Monto - Honorarios - Comisiones - Retenciones - Gastos</li>
+                    <li>Participación de cada socio según su %</li>
+                </ul>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">{{ form.retenciones.label }}</label>
+                    {{ form.retenciones }}
+                    {% if form.retenciones.errors %}<p class="text-red-500 text-xs mt-1">{{ form.retenciones.errors }}</p>{% endif %}
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">{{ form.gastos_relacionados.label }}</label>
+                    {{ form.gastos_relacionados }}
+                    {% if form.gastos_relacionados.errors %}<p class="text-red-500 text-xs mt-1">{{ form.gastos_relacionados.errors }}</p>{% endif %}
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">{{ form.estado.label }}</label>
+                {{ form.estado }}
+                {% if form.estado.errors %}<p class="text-red-500 text-xs mt-1">{{ form.estado.errors }}</p>{% endif %}
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1">{{ form.notas.label }}</label>
+                {{ form.notas }}
+                {% if form.notas.errors %}<p class="text-red-500 text-xs mt-1">{{ form.notas.errors }}</p>{% endif %}
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-4 border-t border-gray-100">
+                <a href="{% url 'profitdistribution_list' %}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition">Cancelar</a>
+                <button type="submit" class="px-6 py-2 bg-green-700 text-white rounded-lg font-semibold hover:bg-green-800 transition">
+                    {% if form.instance.pk %}💾 Guardar Cambios{% else %}✅ Calcular y Distribuir{% endif %}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

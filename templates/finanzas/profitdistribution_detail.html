@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Distribución #{{ distribucion.pk }} - Utilidades - Finanzas{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+    <!-- Back & Actions -->
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+            <a href="{% url 'profitdistribution_list' %}" class="text-gray-500 hover:text-gray-700 transition text-xl">←</a>
+            <h1 class="text-2xl font-bold text-gray-800">📊 Distribución #{{ distribucion.pk }}</h1>
+        </div>
+        <div class="flex gap-2">
+            {% if distribucion.estado == 'borrador' %}
+                <a href="{% url 'profitdistribution_update' distribucion.pk %}" class="px-4 py-2 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition">✏️ Editar</a>
+                <a href="{% url 'profitdistribution_confirmar' distribucion.pk %}" class="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition" onclick="return confirm('¿Confirmar esta distribución? Esto registrará las utilidades de los socios.')">✅ Confirmar</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <div class="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Monto Convenio</div>
+            <div class="text-2xl font-bold text-gray-800">${{ distribucion.monto_convenio|floatformat:2 }}</div>
+            <div class="text-xs text-gray-500 mt-1">{{ distribucion.convenio.cliente.nombre }}</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <div class="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Honorarios</div>
+            <div class="text-2xl font-bold text-blue-700">${{ distribucion.honorarios|floatformat:2 }}</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+            <div class="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Comisiones</div>
+            <div class="text-2xl font-bold text-purple-700">${{ distribucion.comisiones|floatformat:2 }}</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border {% if distribucion.utilidad_neta >= 0 %}border-green-200 bg-green-50{% else %}border-red-200 bg-red-50{% endif %} p-5">
+            <div class="text-xs text-gray-500 uppercase tracking-wide font-semibold mb-1">Utilidad Neta</div>
+            <div class="text-2xl font-bold {% if distribucion.utilidad_neta >= 0 %}text-green-700{% else %}text-red-700{% endif %}">
+                ${{ distribucion.utilidad_neta|floatformat:2 }}
+            </div>
+        </div>
+    </div>
+
+    <!-- Detail Row -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div class="text-xs font-semibold text-gray-500 uppercase">Retenciones</div>
+            <div class="text-lg font-bold text-gray-700">${{ distribucion.retenciones|floatformat:2 }}</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div class="text-xs font-semibold text-gray-500 uppercase">Gastos Relacionados</div>
+            <div class="text-lg font-bold text-gray-700">${{ distribucion.gastos_relacionados|floatformat:2 }}</div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+            <div class="text-xs font-semibold text-gray-500 uppercase">Estado</div>
+            <div class="mt-1">
+                {% if distribucion.estado == 'confirmada' %}
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">✅ Confirmada</span>
+                {% elif distribucion.estado == 'distribuida' %}
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">📊 Distribuida</span>
+                {% elif distribucion.estado == 'cancelada' %}
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">❌ Cancelada</span>
+                {% else %}
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800">📝 Borrador</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Description and Notes -->
+    {% if distribucion.descripcion %}
+    <div class="bg-gray-50 rounded-xl border border-gray-200 p-4">
+        <div class="text-xs font-semibold text-gray-500 uppercase mb-1">📝 Descripción</div>
+        <p class="text-gray-700">{{ distribucion.descripcion }}</p>
+    </div>
+    {% endif %}
+
+    {% if distribucion.notas %}
+    <div class="bg-gray-50 rounded-xl border border-gray-200 p-4">
+        <div class="text-xs font-semibold text-gray-500 uppercase mb-1">📌 Notas</div>
+        <p class="text-gray-700 whitespace-pre-wrap">{{ distribucion.notas }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Participaciones de Socios -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100">
+            <h2 class="text-lg font-bold text-gray-800">👥 Participaciones de Socios</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-gray-50 text-gray-600 uppercase text-xs font-semibold">
+                    <tr>
+                        <th class="px-4 py-3 text-left">Socio</th>
+                        <th class="px-4 py-3 text-center">% Participación</th>
+                        <th class="px-4 py-3 text-right">Monto</th>
+                        <th class="px-4 py-3 text-center">Estado</th>
+                        <th class="px-4 py-3 text-left">Fecha Pago</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for pp in participaciones %}
+                    <tr class="hover:bg-gray-50 transition">
+                        <td class="px-4 py-3 font-medium text-gray-800">{{ pp.partner.nombre }}</td>
+                        <td class="px-4 py-3 text-center">{{ pp.porcentaje }}%</td>
+                        <td class="px-4 py-3 text-right font-mono font-bold text-green-700">${{ pp.monto|floatformat:2 }}</td>
+                        <td class="px-4 py-3 text-center">
+                            {% if pp.estado == 'pagado' %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">✅ Pagado</span>
+                            {% elif pp.estado == 'cancelado' %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">❌ Cancelado</span>
+                            {% else %}
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">⏳ Pendiente</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3">{{ pp.fecha_pago|date:"d/m/Y"|default:"—" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="px-4 py-6 text-center text-gray-500">No hay participaciones generadas.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if participaciones %}
+        <div class="px-5 py-3 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
+            <span class="text-sm font-semibold text-gray-600">Total Distribuido:</span>
+            <span class="text-lg font-bold text-gray-800">${{ total_distribuido|floatformat:2 }}</span>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Convenio Detail Link -->
+    <div class="bg-gray-50 rounded-xl border border-gray-200 p-4 flex items-center justify-between">
+        <div>
+            <span class="text-sm text-gray-600">Convenio relacionado:</span>
+            <strong class="text-gray-800 ml-1">{{ distribucion.convenio.cliente.nombre }}</strong>
+            <span class="text-gray-500 ml-2">(${{ distribucion.convenio.monto_convenio|floatformat:2 }})</span>
+        </div>
+        <a href="{% url 'agreement_detail' distribucion.convenio.pk %}" class="text-blue-600 hover:underline text-sm font-medium">Ver Convenio →</a>
+    </div>
+</div>
+{% endblock %}

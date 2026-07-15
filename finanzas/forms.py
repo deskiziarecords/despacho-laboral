@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User
-from .models import CashMovement, Office, Partner, WorkWeek, PartnerLoan, Agreement, Honorario
+from .models import CashMovement, Office, Partner, WorkWeek, PartnerLoan, Agreement, Honorario, ProfitDistribution
 
 
 class AgreementForm(forms.ModelForm):
@@ -113,3 +113,31 @@ class PartnerLoanForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['socio_origen'].queryset = Partner.objects.filter(activo=True)
         self.fields['socio_destino'].queryset = Partner.objects.filter(activo=True)
+
+
+class ProfitDistributionForm(forms.ModelForm):
+    class Meta:
+        model = ProfitDistribution
+        fields = ['convenio', 'fecha', 'descripcion', 'retenciones', 'gastos_relacionados', 'estado', 'notas']
+        widgets = {
+            'convenio': forms.Select(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
+            'fecha': forms.DateInput(attrs={'type': 'date', 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
+            'descripcion': forms.TextInput(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500', 'placeholder': 'Ej: Distribución del convenio con...'}),
+            'retenciones': forms.NumberInput(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500', 'step': '0.01', 'placeholder': '0.00'}),
+            'gastos_relacionados': forms.NumberInput(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500', 'step': '0.01', 'placeholder': '0.00'}),
+            'estado': forms.Select(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
+            'notas': forms.Textarea(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500', 'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        self.fields['convenio'].queryset = Agreement.objects.filter(estado__in=['firmado', 'pagado', 'parcial']).order_by('-fecha')
+        if self.instance and self.instance.pk:
+            self.fields['convenio'].widget.attrs['disabled'] = True
+
+    def clean_convenio(self):
+        """Allow reading disabled convenio field on edit."""
+        if self.instance and self.instance.pk:
+            return self.instance.convenio
+        return self.cleaned_data.get('convenio')

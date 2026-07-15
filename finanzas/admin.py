@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils import timezone
-from .models import Office, SettlementPayment, Expense, Commission, Employee, Payroll, CashMovement, Partner, WorkWeek, PartnerLoan, Agreement, Honorario
+from .models import Office, SettlementPayment, Expense, Commission, Employee, Payroll, CashMovement, Partner, WorkWeek, PartnerLoan, Agreement, Honorario, ProfitDistribution, PartnerProfit, PartnerUtilitySummary
 
 
 @admin.register(Office)
@@ -393,3 +393,87 @@ class CashMovementAdmin(admin.ModelAdmin):
             if not obj.registrado_por_id:
                 obj.registrado_por = request.user
         super().save_model(request, obj, form, change)
+
+
+@admin.register(ProfitDistribution)
+class ProfitDistributionAdmin(admin.ModelAdmin):
+    list_display = ['fecha', 'convenio', 'monto_convenio_formateado', 'utilidad_neta_formateada', 'estado', 'total_distribuido']
+    list_filter = ['estado', 'fecha']
+    search_fields = ['convenio__cliente__nombre', 'descripcion', 'notas']
+    date_hierarchy = 'fecha'
+    autocomplete_fields = ['convenio', 'creado_por']
+    readonly_fields = ['monto_convenio', 'honorarios', 'comisiones', 'utilidad_neta', 'total_distribuido', 'created_at', 'updated_at']
+    fieldsets = [
+        ('Información de la Distribución', {
+            'fields': ['convenio', 'fecha', 'descripcion', 'estado']
+        }),
+        ('Cálculos Automáticos', {
+            'fields': ['monto_convenio', 'honorarios', 'comisiones', 'retenciones', 'gastos_relacionados'],
+            'description': 'Los montos de convenio, honorarios y comisiones se calculan automáticamente.'
+        }),
+        ('Resultado', {
+            'fields': ['utilidad_neta', 'total_distribuido']
+        }),
+        ('Notas', {
+            'fields': ['notas']
+        }),
+        ('Auditoría', {
+            'fields': ['creado_por', 'created_at', 'updated_at'],
+            'classes': ['collapse']
+        }),
+    ]
+
+    def monto_convenio_formateado(self, obj):
+        return f'${obj.monto_convenio:,.2f}'
+    monto_convenio_formateado.short_description = 'Monto Convenio'
+
+    def utilidad_neta_formateada(self, obj):
+        return f'${obj.utilidad_neta:,.2f}'
+    utilidad_neta_formateada.short_description = 'Utilidad Neta'
+    utilidad_neta_formateada.admin_order_field = 'utilidad_neta'
+
+    def save_model(self, request, obj, form, change):
+        if not obj.pk:
+            if not obj.creado_por_id:
+                obj.creado_por = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(PartnerProfit)
+class PartnerProfitAdmin(admin.ModelAdmin):
+    list_display = ['distribucion', 'partner', 'porcentaje', 'monto_formateado', 'estado', 'fecha_pago']
+    list_filter = ['estado', 'partner']
+    search_fields = ['partner__nombre', 'distribucion__convenio__cliente__nombre', 'notas']
+    autocomplete_fields = ['distribucion', 'partner']
+    list_editable = ['estado', 'fecha_pago']
+    readonly_fields = ['porcentaje', 'monto', 'created_at', 'updated_at']
+    fieldsets = [
+        ('Participación', {'fields': ['distribucion', 'partner', 'porcentaje', 'monto']}),
+        ('Estado', {'fields': ['estado', 'fecha_pago']}),
+        ('Notas', {'fields': ['notas']}),
+        ('Auditoría', {'fields': ['created_at', 'updated_at'], 'classes': ['collapse']}),
+    ]
+
+    def monto_formateado(self, obj):
+        return f'${obj.monto:,.2f}'
+    monto_formateado.short_description = 'Monto'
+    monto_formateado.admin_order_field = 'monto'
+
+
+@admin.register(PartnerUtilitySummary)
+class PartnerUtilitySummaryAdmin(admin.ModelAdmin):
+    list_display = ['partner', 'utilidad_generada_formateada', 'utilidad_pagada_formateada', 'utilidad_pendiente_formateada', 'ultima_actualizacion']
+    search_fields = ['partner__nombre']
+    readonly_fields = ['utilidad_generada', 'utilidad_pagada', 'utilidad_pendiente', 'ultima_actualizacion']
+
+    def utilidad_generada_formateada(self, obj):
+        return f'${obj.utilidad_generada:,.2f}'
+    utilidad_generada_formateada.short_description = 'Generada'
+
+    def utilidad_pagada_formateada(self, obj):
+        return f'${obj.utilidad_pagada:,.2f}'
+    utilidad_pagada_formateada.short_description = 'Pagada'
+
+    def utilidad_pendiente_formateada(self, obj):
+        return f'${obj.utilidad_pendiente:,.2f}'
+    utilidad_pendiente_formateada.short_description = 'Pendiente'
