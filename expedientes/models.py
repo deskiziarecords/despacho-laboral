@@ -776,6 +776,70 @@ class Machote(models.Model):
         return re.findall(r'\{\{\s*(\w+)\s*\}\}', self.contenido_html)
 
 
+class TareaConciliacion(models.Model):
+    """
+    Rastrea el estado de las tareas de conciliación automática asíncronas.
+    
+    Cuando el usuario inicia el envío automático al portal de conciliación,
+    se crea un registro aquí y la tarea se ejecuta en un hilo separado
+    para evitar timeouts de HTTP/Gunicorn.
+    """
+
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('ejecutando', 'Ejecutando'),
+        ('completado', 'Completado'),
+        ('fallido', 'Fallido'),
+    ]
+
+    expediente = models.ForeignKey(
+        'Expediente', on_delete=models.CASCADE,
+        related_name='tareas_conciliacion',
+        verbose_name='Expediente'
+    )
+    usuario = models.ForeignKey(
+        User, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        verbose_name='Iniciada por'
+    )
+    estado = models.CharField(
+        'Estado', max_length=15,
+        choices=ESTADO_CHOICES, default='pendiente'
+    )
+    folio = models.CharField('Folio generado', max_length=50, blank=True)
+    pdf_path = models.CharField('Ruta del PDF', max_length=500, blank=True)
+    error = models.TextField('Error', blank=True)
+    detalle = models.TextField('Detalle', blank=True)
+    screenshots_json = models.TextField('Capturas (JSON)', blank=True,
+                                         help_text='Lista de rutas de screenshots en formato JSON')
+    modo = models.CharField('Modo', max_length=15, default='automatico',
+                             choices=[('automatico', 'Automático (Headless)'), ('debug', 'Visible (Debug)')])
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField('Completada en', null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Tarea de Conciliación'
+        verbose_name_plural = 'Tareas de Conciliación'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['estado']),
+            models.Index(fields=['expediente', 'estado']),
+        ]
+
+    def __str__(self):
+        return f'Tarea {self.pk} - {self.expediente.numero} ({self.get_estado_display()})'
+
+    def tiempo_transcurrido(self):
+        """Retorna el tiempo transcurrido desde la creación."""
+        if not self.created_at:
+            return '—'
+        delta = (self.completed_at or timezone.now()) - self.created_at
+        total_segundos = int(delta.total_seconds())
+        if total_segundos < 60:
+            return f'{total_segundos}s'
+        return f'{total_segundos // 60}m {total_segundos % 60}s'
+
+
 class WhatsAppMessage(models.Model):
     TIPO_CHOICES = [
         ('recordatorio_audiencia', 'Recordatorio de Audiencia'),

@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils import timezone
 
-from .models import Cliente, Expediente, Documento, Movimiento, Nota, SolicitudConciliacion, WhatsAppMessage, LegalConfig, CalculoLaboral, Machote, Aviso, SolicitudTransferencia, Notificacion
+from .models import Cliente, Expediente, Documento, Movimiento, Nota, SolicitudConciliacion, WhatsAppMessage, LegalConfig, CalculoLaboral, Machote, Aviso, SolicitudTransferencia, Notificacion, TareaConciliacion
 
 
 @admin.register(SolicitudTransferencia)
@@ -180,6 +180,22 @@ class MachoteAdmin(admin.ModelAdmin):
             'fields': ['archivo_origen', 'created_at', 'updated_at'],
             'classes': ['collapse']
         }),
+    ]
+
+
+@admin.register(TareaConciliacion)
+class TareaConciliacionAdmin(admin.ModelAdmin):
+    list_display = ['pk', 'expediente', 'usuario', 'estado', 'folio', 'modo', 'created_at', 'completed_at']
+    list_filter = ['estado', 'modo', 'created_at']
+    search_fields = ['expediente__numero', 'folio', 'error', 'detalle']
+    readonly_fields = ['created_at', 'completed_at']
+    date_hierarchy = 'created_at'
+    autocomplete_fields = ['expediente', 'usuario']
+    fieldsets = [
+        ('Expediente y Usuario', {'fields': ['expediente', 'usuario', 'modo']}),
+        ('Estado', {'fields': ['estado', 'created_at', 'completed_at', 'tiempo_transcurrido']}),
+        ('Resultado', {'fields': ['folio', 'pdf_path', 'detalle', 'error']}),
+        ('Screenshots', {'fields': ['screenshots_json'], 'classes': ['collapse']}),
     ]
 
 

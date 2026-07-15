@@ -1,0 +1,266 @@
+{% extends 'base.html' %}
+{% load static custom_filters %}
+{% block title %}Enviando a Conciliación - {{ expediente.numero }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-4" id="status-container">
+    <div class="card">
+        <div class="card-header" style="background: #2a3340; color: white; border-bottom: none;">
+            <h1 class="text-sm font-bold">🚀 Envío al Portal de Conciliación</h1>
+        </div>
+
+        <div class="card-body space-y-6">
+            <!-- Estado pendiente/ejecutando -->
+            <div id="loading-state" class="text-center py-8 space-y-4">
+                <div class="flex justify-center">
+                    <div class="relative w-20 h-20">
+                        <!-- Anillo giratorio -->
+                        <div class="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
+                        <div class="absolute inset-0 border-4 border-transparent border-t-blue-600 rounded-full animate-spin"></div>
+                        <!-- Icono -->
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <span class="text-3xl" id="status-icon">🚀</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-800" id="status-title">Iniciando envío...</h2>
+                    <p class="text-sm text-gray-500 mt-1" id="status-message">Preparando la automatización del formulario de conciliación.</p>
+                </div>
+
+                <!-- Barra de progreso animada -->
+                <div class="max-w-xs mx-auto">
+                    <div class="bg-gray-200 rounded-full h-2 overflow-hidden">
+                        <div id="progress-bar" class="h-full rounded-full transition-all duration-500"
+                             style="width: 15%; background: linear-gradient(90deg, #3b82f6, #8b5cf6);">
+                        </div>
+                    </div>
+                    <div class="flex justify-between text-xs text-gray-400 mt-1">
+                        <span>Iniciando</span>
+                        <span id="progress-text">Paso 1/8</span>
+                        <span>Completado</span>
+                    </div>
+                </div>
+
+                <!-- Tiempo transcurrido -->
+                <div class="text-sm text-gray-500">
+                    ⏱ Tiempo transcurrido: <span id="elapsed-time">0s</span>
+                </div>
+
+                <!-- Pasos del proceso -->
+                <div class="grid grid-cols-4 gap-2 text-xs mt-4">
+                    <div class="step-item text-center p-2 rounded-lg bg-gray-50" data-step="1">
+                        <div class="step-dot w-6 h-6 rounded-full bg-gray-300 mx-auto mb-1 flex items-center justify-center text-white text-xs font-bold">1</div>
+                        <span class="text-gray-500">Cargar portal</span>
+                    </div>
+                    <div class="step-item text-center p-2 rounded-lg bg-gray-50" data-step="2">
+                        <div class="step-dot w-6 h-6 rounded-full bg-gray-300 mx-auto mb-1 flex items-center justify-center text-white text-xs font-bold">2</div>
+                        <span class="text-gray-500">Aviso privacidad</span>
+                    </div>
+                    <div class="step-item text-center p-2 rounded-lg bg-gray-50" data-step="3">
+                        <div class="step-dot w-6 h-6 rounded-full bg-gray-300 mx-auto mb-1 flex items-center justify-center text-white text-xs font-bold">3</div>
+                        <span class="text-gray-500">Industria</span>
+                    </div>
+                    <div class="step-item text-center p-2 rounded-lg bg-gray-50" data-step="4">
+                        <div class="step-dot w-6 h-6 rounded-full bg-gray-300 mx-auto mb-1 flex items-center justify-center text-white text-xs font-bold">4</div>
+                        <span class="text-gray-500">Solicitante</span>
+                    </div>
+                    <div class="step-item text-center p-2 rounded-lg bg-gray-50" data-step="5">
+                        <div class="step-dot w-6 h-6 rounded-full bg-gray-300 mx-auto mb-1 flex items-center justify-center text-white text-xs font-bold">5</div>
+                        <span class="text-gray-500">Citado</span>
+                    </div>
+                    <div class="step-item text-center p-2 rounded-lg bg-gray-50" data-step="6">
+                        <div class="step-dot w-6 h-6 rounded-full bg-gray-300 mx-auto mb-1 flex items-center justify-center text-white text-xs font-bold">6</div>
+                        <span class="text-gray-500">Descripción</span>
+                    </div>
+                    <div class="step-item text-center p-2 rounded-lg bg-gray-50" data-step="7">
+                        <div class="step-dot w-6 h-6 rounded-full bg-gray-300 mx-auto mb-1 flex items-center justify-center text-white text-xs font-bold">7</div>
+                        <span class="text-gray-500">Enviar</span>
+                    </div>
+                    <div class="step-item text-center p-2 rounded-lg bg-gray-50" data-step="8">
+                        <div class="step-dot w-6 h-6 rounded-full bg-gray-300 mx-auto mb-1 flex items-center justify-center text-white text-xs font-bold">8</div>
+                        <span class="text-gray-500">Descargar PDF</span>
+                    </div>
+                </div>
+
+                <!-- Botón cancelar/oculto durante ejecución -->
+                <div class="text-center">
+                    <a href="{% url 'expediente_detail' expediente.pk %}" class="text-sm text-gray-500 hover:text-gray-700 underline">
+                        Volver al expediente
+                    </a>
+                </div>
+            </div>
+
+            <!-- Estado completado (inicialmente oculto) -->
+            <div id="completed-state" class="hidden text-center py-8 space-y-4">
+                <div class="text-6xl">✅</div>
+                <h2 class="text-xl font-bold text-green-700">¡Solicitud enviada exitosamente!</h2>
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4 text-left space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Folio:</span>
+                        <span class="font-semibold text-gray-800" id="result-folio">—</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Expediente:</span>
+                        <span class="font-semibold text-gray-800">{{ expediente.numero }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Cliente:</span>
+                        <span class="font-semibold text-gray-800">{{ expediente.cliente.nombre }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Tiempo total:</span>
+                        <span class="font-semibold text-gray-800" id="result-time">—</span>
+                    </div>
+                </div>
+                <div class="flex space-x-3 justify-center">
+                    <a href="{% url 'expediente_detail' expediente.pk %}" class="btn btn-primary">
+                        📋 Ver Expediente
+                    </a>
+                    <a href="{% url 'enviar_conciliacion_automation' expediente.pk %}" class="btn" style="background:#6b7280; color:white;">
+                        🔄 Enviar de nuevo
+                    </a>
+                </div>
+            </div>
+
+            <!-- Estado fallido (inicialmente oculto) -->
+            <div id="failed-state" class="hidden text-center py-8 space-y-4">
+                <div class="text-6xl">❌</div>
+                <h2 class="text-xl font-bold text-red-700">Error al enviar la solicitud</h2>
+                <div class="bg-red-50 border border-red-200 rounded-lg p-4 text-left">
+                    <p class="text-sm font-medium text-red-800" id="result-error">—</p>
+                    <p class="text-xs text-red-600 mt-2" id="result-error-detail"></p>
+                </div>
+                <div class="flex space-x-3 justify-center">
+                    <a href="{% url 'expediente_detail' expediente.pk %}" class="btn btn-primary">
+                        📋 Ver Expediente
+                    </a>
+                    <a href="{% url 'enviar_conciliacion_automation' expediente.pk %}" class="btn" style="background:#6b7280; color:white;">
+                        🔄 Reintentar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    const TASK_ID = {{ task.pk }};
+    const STATUS_URL = "{% url 'conciliacion_estado' task.pk %}";
+    const EXPEDIENTE_URL = "{% url 'expediente_detail' expediente.pk %}";
+    const START_TIME = Date.now();
+    const MAX_WAIT_SECONDS = 300; // 5 minutos máximo
+    let pollInterval = null;
+
+    // Elementos DOM
+    const loadingState = document.getElementById('loading-state');
+    const completedState = document.getElementById('completed-state');
+    const failedState = document.getElementById('failed-state');
+    const statusTitle = document.getElementById('status-title');
+    const statusMessage = document.getElementById('status-message');
+    const statusIcon = document.getElementById('status-icon');
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const elapsedTime = document.getElementById('elapsed-time');
+
+    function updateElapsedTime() {
+        if (!loadingState.classList.contains('hidden')) {
+            const elapsed = Math.floor((Date.now() - START_TIME) / 1000);
+            if (elapsed < 60) {
+                elapsedTime.textContent = elapsed + 's';
+            } else {
+                const mins = Math.floor(elapsed / 60);
+                const secs = elapsed % 60;
+                elapsedTime.textContent = mins + 'm ' + secs + 's';
+            }
+        }
+    }
+
+    function updateProgress(estado) {
+        const steps = {
+            'pendiente': { width: '10%', text: 'Preparando...', step: '1/8', icon: '📋' },
+            'ejecutando': { width: '30%', text: 'Enviando al portal...', step: '3/8', icon: '🤖' },
+            'completado': { width: '100%', text: '¡Completado!', step: '8/8', icon: '✅' },
+            'fallido': { width: '60%', text: 'Error', step: '—', icon: '❌' },
+        };
+        const s = steps[estado] || steps['pendiente'];
+        progressBar.style.width = s.width;
+        progressText.textContent = s.step;
+        if (statusIcon) statusIcon.textContent = s.icon;
+    }
+
+    function showResult(data) {
+        if (data.estado === 'completado') {
+            loadingState.classList.add('hidden');
+            completedState.classList.remove('hidden');
+            document.getElementById('result-folio').textContent = data.folio || 'N/A';
+            const elapsed = Math.floor((data.completed_at ? new Date(data.completed_at).getTime() - new Date(data.created_at).getTime() : Date.now() - START_TIME) / 1000);
+            document.getElementById('result-time').textContent = elapsed < 60 ? elapsed + 's' : Math.floor(elapsed / 60) + 'm ' + (elapsed % 60) + 's';
+        } else if (data.estado === 'fallido') {
+            loadingState.classList.add('hidden');
+            failedState.classList.remove('hidden');
+            document.getElementById('result-error').textContent = data.error || 'Error desconocido';
+            if (data.detalle) {
+                document.getElementById('result-error-detail').textContent = data.detalle;
+            }
+        } else if (data.estado === 'pendiente') {
+            statusTitle.textContent = 'En cola...';
+            statusMessage.textContent = 'La tarea está esperando para iniciar.';
+            updateProgress('pendiente');
+        } else if (data.estado === 'ejecutando') {
+            statusTitle.textContent = '🤖 Ejecutando automatización...';
+            statusMessage.textContent = 'Navegando el portal de conciliación paso a paso.';
+            updateProgress('ejecutando');
+        }
+    }
+
+    function checkStatus() {
+        fetch(STATUS_URL)
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    clearInterval(pollInterval);
+                    loadingState.classList.add('hidden');
+                    failedState.classList.remove('hidden');
+                    document.getElementById('result-error').textContent = data.error;
+                    return;
+                }
+
+                showResult(data);
+
+                // Si ya terminó, dejar de hacer polling
+                if (data.estado === 'completado' || data.estado === 'fallido') {
+                    clearInterval(pollInterval);
+                }
+            })
+            .catch(err => {
+                console.error('Error checking conciliation status:', err);
+            });
+    }
+
+    // Iniciar polling cada 3 segundos
+    pollInterval = setInterval(function() {
+        // Timeout de seguridad: si pasa más de MAX_WAIT_SECONDS, mostrar error
+        if ((Date.now() - START_TIME) / 1000 > MAX_WAIT_SECONDS) {
+            clearInterval(pollInterval);
+            loadingState.classList.add('hidden');
+            failedState.classList.remove('hidden');
+            document.getElementById('result-error').textContent = 'La tarea tardó demasiado tiempo en completarse. Es posible que el servidor haya reiniciado o que haya ocurrido un error de conexión con el portal de conciliación.';
+            document.getElementById('result-error-detail').textContent = 'Timeout después de ' + Math.floor((Date.now() - START_TIME) / 1000) + 's. Intenta de nuevo.';
+            return;
+        }
+        checkStatus();
+    }, 3000);
+
+    // Actualizar tiempo transcurrido cada segundo
+    setInterval(updateElapsedTime, 1000);
+
+    // Primera consulta inmediata
+    checkStatus();
+})();
+</script>
+{% endblock %}

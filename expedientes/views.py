@@ -1,5 +1,7 @@
+import json
 import logging
 import re
+import threading
 from datetime import datetime, timedelta
 
 from django.contrib.auth.decorators import login_required
@@ -25,7 +27,7 @@ from .forms import (ClienteForm, DocumentoForm, ExpedienteForm, NotaForm,
                        SolicitudConciliacionForm, WhatsAppMessageForm,
                        CalculoLaboralForm, SimulacionForm)
 from .models import (Cliente, Documento, Expediente, Movimiento, Nota,
-                      SolicitudConciliacion, WhatsAppMessage,
+                      SolicitudConciliacion, WhatsAppMessage, TareaConciliacion,
                       CalculoLaboral, LegalConfig, Aviso,
                       SolicitudTransferencia, Notificacion)
 from .signals import registrar_movimiento
@@ -1812,15 +1814,80 @@ def reportes_admin(request):
     return render(request, 'expedientes/reportes_admin.html', context)
 
 
-# ─── Automatización de Conciliación ─────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+#  Automatización de Conciliación — ASÍNCRONA (threading)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _ejecutar_conciliacion_en_hilo(task_id):
+    """
+    Ejecuta la automatización de conciliación en un hilo separado.
+
+    Esto evita que el HTTP request se bloquee durante los 30-90 segundos
+    que tarda Playwright en navegar y llenar el formulario del portal.
+    """
+    from django.db import close_old_connections
+
+    close_old_connections()
+    logger.info(f'[Hilo] Iniciando tarea de conciliación #{task_id}')
+
+    try:
+        # Marcar como ejecutando
+        task = TareaConciliacion.objects.get(pk=task_id)
+        task.estado = 'ejecutando'
+        task.save(update_fields=['estado'])
+
+        close_old_connections()
+
+        # Ejecutar la automatización (esto puede tomar 30-90 segundos)
+        resultado = enviar_conciliacion(
+            task.expediente,
+            usuario=task.usuario,
+            headless=True,  # Siempre headless en background
+        )
+
+        close_old_connections()
+
+        # Recargar la tarea desde la BD (por si cambió entre tanto)
+        task.refresh_from_db()
+
+        if resultado.success:
+            task.estado = 'completado'
+            task.folio = resultado.folio or ''
+            task.pdf_path = resultado.pdf_path or ''
+        else:
+            task.estado = 'fallido'
+            task.error = resultado.error or 'Error desconocido al enviar al portal'
+
+        task.detalle = resultado.detalle or ''
+        if resultado.screenshots:
+            task.screenshots_json = json.dumps(resultado.screenshots)
+        else:
+            task.screenshots_json = ''
+        task.completed_at = timezone.now()
+        task.save()
+
+        logger.info(f'[Hilo] Tarea #{task_id} completada: {task.estado}')
+
+    except Exception as e:
+        close_old_connections()
+        logger.exception(f'[Hilo] Error en tarea de conciliación #{task_id}')
+        try:
+            task = TareaConciliacion.objects.get(pk=task_id)
+            task.estado = 'fallido'
+            task.error = f'{type(e).__name__}: {str(e)}'
+            task.completed_at = timezone.now()
+            task.save(update_fields=['estado', 'error', 'completed_at'])
+        except:
+            pass
+
 
 @login_required
 def enviar_conciliacion_automation(request, pk):
     """
-    Vista que ejecuta la automatización del formulario de conciliación
-    del portal de Baja California.
+    Vista que inicia el envío automático al portal de conciliación.
 
-    Abre un navegador controlado, llena los datos y captura el PDF/folio.
+    AHORA ES ASÍNCRONA: crea una tarea en BD, la ejecuta en un hilo
+    separado y redirige a una página de progreso para evitar timeouts.
     """
     expediente = get_object_or_404(get_expedientes_queryset(request.user), pk=pk)
 
@@ -1835,37 +1902,77 @@ def enviar_conciliacion_automation(request, pk):
 
     if request.method == 'POST':
         modo = request.POST.get('modo', 'automatico')
-        headless = modo == 'automatico'
+
+        # Crear la tarea en la BD
+        task = TareaConciliacion.objects.create(
+            expediente=expediente,
+            usuario=request.user,
+            estado='pendiente',
+            modo=modo,
+        )
+
+        # Iniciar la ejecución en un hilo separado
+        hilo = threading.Thread(
+            target=_ejecutar_conciliacion_en_hilo,
+            args=(task.pk,),
+            daemon=True,
+        )
+        hilo.start()
 
         messages.info(request, '🚀 Iniciando envío automático al portal de conciliación...')
-
-        try:
-            resultado = enviar_conciliacion(
-                expediente,
-                usuario=request.user,
-                headless=headless,
-            )
-
-            if resultado.success:
-                msg = f'✅ Solicitud enviada exitosamente. Folio: {resultado.folio or "N/A"}.'
-                if resultado.pdf_path:
-                    msg += f' PDF guardado: {resultado.pdf_path}'
-                messages.success(request, msg)
-            else:
-                mensaje_error = resultado.error or 'Error desconocido al enviar al portal'
-                messages.error(request, f'❌ Error al enviar: {mensaje_error}')
-
-                if resultado.screenshots:
-                    messages.warning(request, 'Se tomaron capturas de pantalla para depuración.')
-
-        except Exception as e:
-            logger.exception(f'Error en enviar_conciliacion_automation para expediente {expediente.numero}')
-            messages.error(request, f'Error inesperado: {str(e)}')
-
-        return redirect('expediente_detail', pk=expediente.pk)
+        return redirect('conciliacion_procesando', task_pk=task.pk)
 
     # GET: mostrar página de confirmación
     return render(request, 'expedientes/conciliacion_confirmar.html', {
         'expediente': expediente,
+        'ESTADO_COLORS': ESTADO_COLORS,
+    })
+
+
+@login_required
+def conciliacion_estado(request, task_pk):
+    """
+    API JSON: retorna el estado actual de una tarea de conciliación.
+    Usado por la página de progreso para polling vía JavaScript.
+    """
+    task = get_object_or_404(TareaConciliacion.objects.select_related('expediente'), pk=task_pk)
+
+    # Asegurar que el usuario tenga acceso al expediente
+    expedientes_qs = get_expedientes_queryset(request.user)
+    if not expedientes_qs.filter(pk=task.expediente.pk).exists():
+        return JsonResponse({'error': 'No autorizado'}, status=403)
+
+    data = {
+        'task_id': task.pk,
+        'estado': task.estado,
+        'expediente_id': task.expediente_id,
+        'expediente_numero': task.expediente.numero,
+        'folio': task.folio,
+        'error': task.error,
+        'detalle': task.detalle,
+        'created_at': task.created_at.isoformat() if task.created_at else None,
+        'completed_at': task.completed_at.isoformat() if task.completed_at else None,
+    }
+
+    return JsonResponse(data)
+
+
+@login_required
+def conciliacion_procesando(request, task_pk):
+    """
+    Página de progreso: muestra una animación mientras se ejecuta
+    la automatización en segundo plano y redirige cuando termina.
+    """
+    task = get_object_or_404(TareaConciliacion, pk=task_pk)
+
+    # Asegurar que el usuario tenga acceso al expediente
+    expedientes_qs = get_expedientes_queryset(request.user)
+    if not expedientes_qs.filter(pk=task.expediente.pk).exists():
+        messages.error(request, 'No tienes acceso a este expediente.')
+        return redirect('dashboard_redirect')
+
+    return render(request, 'expedientes/conciliacion_procesando.html', {
+        'task': task,
+        'expediente': task.expediente,
         'ESTADO_COLORS': ESTADO_COLORS,
     })
