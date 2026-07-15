@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Semanas - Finanzas{% endblock %}
+
+{% block content %}
+<div class="space-y-3">
+    <div class="flex items-center justify-between">
+        <h1 class="text-lg font-bold text-gray-800">📅 Semanas de Trabajo</h1>
+        <a href="{% url 'workweek_create' %}" class="btn btn-primary">+ Nueva Semana</a>
+    </div>
+
+    <form method="get" class="flex gap-2">
+        <select name="estado" class="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+            <option value="">Todas</option>
+            <option value="abierta" {% if filtros.estado == 'abierta' %}selected{% endif %}>Abiertas</option>
+            <option value="cerrada" {% if filtros.estado == 'cerrada' %}selected{% endif %}>Cerradas</option>
+        </select>
+        <button type="submit" class="btn btn-primary">Filtrar</button>
+        {% if filtros.estado %}<a href="{% url 'workweek_list' %}" class="btn">Limpiar</a>{% endif %}
+    </form>
+
+    <div class="bg-white rounded shadow-sm border border-gray-200 overflow-hidden">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th>Semana</th>
+                    <th>Inicio</th>
+                    <th>Fin</th>
+                    <th>Ingresos</th>
+                    <th>Gastos</th>
+                    <th>Balance</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for week in weeks %}
+                <tr>
+                    <td class="font-medium">Semana {{ week.numero }}</td>
+                    <td>{{ week.fecha_inicio|date:"d/m/Y" }}</td>
+                    <td>{{ week.fecha_fin|date:"d/m/Y" }}</td>
+                    <td class="text-green-700 font-medium">${{ week.total_ingresos|floatformat:2 }}</td>
+                    <td class="text-red-700 font-medium">${{ week.total_gastos|floatformat:2 }}</td>
+                    <td class="font-bold {% if week.balance >= 0 %}text-green-700{% else %}text-red-700{% endif %}">
+                        ${{ week.balance|floatformat:2 }}
+                    </td>
+                    <td>
+                        {% if week.estado == 'abierta' %}
+                        <span class="badge bg-green-100 text-green-700">Abierta</span>
+                        {% else %}
+                        <span class="badge bg-gray-100 text-gray-500">Cerrada</span>
+                        {% endif %}
+                    </td>
+                    <td><a href="{% url 'workweek_update' week.pk %}" class="text-blue-600 hover:text-blue-800 text-xs">Editar</a></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8" class="text-center py-8 text-gray-400">No hay semanas registradas.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if is_paginated %}
+    <div class="flex justify-center gap-2 mt-4">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if filtros.estado %}&estado={{ filtros.estado }}{% endif %}" class="btn btn-sm">← Anterior</a>
+        {% endif %}
+        <span class="px-3 py-1 text-sm text-gray-600">Pág. {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if filtros.estado %}&estado={{ filtros.estado }}{% endif %}" class="btn btn-sm">Siguiente →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

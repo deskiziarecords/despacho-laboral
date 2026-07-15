@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Socios - Finanzas{% endblock %}
+
+{% block content %}
+<div class="space-y-3">
+    <div class="flex items-center justify-between">
+        <h1 class="text-lg font-bold text-gray-800">👥 Socios del Despacho</h1>
+        <a href="{% url 'partner_create' %}" class="btn btn-primary">+ Nuevo Socio</a>
+    </div>
+
+    <!-- Búsqueda -->
+    <form method="get" class="flex gap-2">
+        <input type="text" name="q" value="{{ filtros.q|default:'' }}" placeholder="Buscar socio..." class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+        <button type="submit" class="btn btn-primary">Buscar</button>
+        {% if filtros.q %}<a href="{% url 'partner_list' %}" class="btn">Limpiar</a>{% endif %}
+    </form>
+
+    <!-- Tabla -->
+    <div class="bg-white rounded shadow-sm border border-gray-200 overflow-hidden">
+        <table class="w-full">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>% Participación</th>
+                    <th>Préstamos Otorgados</th>
+                    <th>Préstamos Recibidos</th>
+                    <th>Saldo Neto</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for partner in partners %}
+                <tr>
+                    <td class="font-medium">
+                        <a href="{% url 'partner_detail' partner.pk %}" class="text-blue-700 hover:text-blue-900">{{ partner.nombre }}</a>
+                    </td>
+                    <td>{{ partner.porcentaje_participacion }}%</td>
+                    <td class="{% if partner.saldo_prestamos_otorgados > 0 %}text-green-700{% endif %}">
+                        ${{ partner.saldo_prestamos_otorgados|floatformat:2 }}
+                    </td>
+                    <td class="{% if partner.saldo_prestamos_recibidos > 0 %}text-red-700{% endif %}">
+                        ${{ partner.saldo_prestamos_recibidos|floatformat:2 }}
+                    </td>
+                    <td class="font-medium {% if partner.saldo_neto >= 0 %}text-green-700{% else %}text-red-700{% endif %}">
+                        ${{ partner.saldo_neto|floatformat:2 }}
+                    </td>
+                    <td>{% if partner.activo %}<span class="badge bg-green-100 text-green-700">Activo</span>{% else %}<span class="badge bg-gray-100 text-gray-500">Inactivo</span>{% endif %}</td>
+                    <td>
+                        <a href="{% url 'partner_detail' partner.pk %}" class="text-blue-600 hover:text-blue-800 text-xs">Ver</a>
+                        <a href="{% url 'partner_update' partner.pk %}" class="text-gray-600 hover:text-gray-800 text-xs ml-2">Editar</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="text-center py-8 text-gray-400">No hay socios registrados.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if is_paginated %}
+    <div class="flex justify-center gap-2 mt-4">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if filtros.q %}&q={{ filtros.q }}{% endif %}" class="btn btn-sm">← Anterior</a>
+        {% endif %}
+        <span class="px-3 py-1 text-sm text-gray-600">Pág. {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if filtros.q %}&q={{ filtros.q }}{% endif %}" class="btn btn-sm">Siguiente →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

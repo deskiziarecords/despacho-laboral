@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils import timezone
-from .models import Office, SettlementPayment, Expense, Commission, Employee, Payroll, CashMovement
+from .models import Office, SettlementPayment, Expense, Commission, Employee, Payroll, CashMovement, Partner, WorkWeek, PartnerLoan
 
 
 @admin.register(Office)
@@ -207,6 +207,63 @@ class PayrollAdmin(admin.ModelAdmin):
         return f'${obj.total_pagado:,.2f}'
     total_pagado_formateado.short_description = 'Total'
     total_pagado_formateado.admin_order_field = 'total_pagado'
+
+    def save_model(self, request, obj, form, change):
+        if not obj.pk:
+            if not obj.registrado_por_id:
+                obj.registrado_por = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(Partner)
+class PartnerAdmin(admin.ModelAdmin):
+    list_display = ['nombre', 'porcentaje_participacion', 'activo', 'saldo_neto', 'created_at']
+    list_filter = ['activo']
+    search_fields = ['nombre', 'email']
+    readonly_fields = ['saldo_neto', 'saldo_prestamos_otorgados', 'saldo_prestamos_recibidos']
+    list_editable = ['porcentaje_participacion']
+    fieldsets = [
+        ('Información General', {'fields': ['nombre', 'porcentaje_participacion']}),
+        ('Contacto', {'fields': ['telefono', 'email']}),
+        ('Estado', {'fields': ['activo', 'notas']}),
+        ('Saldos (calculados)', {'fields': ['saldo_neto', 'saldo_prestamos_otorgados', 'saldo_prestamos_recibidos'], 'classes': ['collapse']}),
+        ('Metadatos', {'fields': ['created_at', 'updated_at'], 'classes': ['collapse']}),
+    ]
+
+
+@admin.register(WorkWeek)
+class WorkWeekAdmin(admin.ModelAdmin):
+    list_display = ['numero', 'fecha_inicio', 'fecha_fin', 'estado', 'total_ingresos', 'total_gastos', 'balance']
+    list_filter = ['estado']
+    date_hierarchy = 'fecha_inicio'
+    readonly_fields = ['total_ingresos', 'total_gastos', 'balance']
+    fieldsets = [
+        ('Información', {'fields': ['numero', 'fecha_inicio', 'fecha_fin', 'estado']}),
+        ('Notas', {'fields': ['notas']}),
+        ('Resumen (calculado)', {'fields': ['total_ingresos', 'total_gastos', 'balance'], 'classes': ['collapse']}),
+        ('Metadatos', {'fields': ['created_at', 'updated_at'], 'classes': ['collapse']}),
+    ]
+
+
+@admin.register(PartnerLoan)
+class PartnerLoanAdmin(admin.ModelAdmin):
+    list_display = ['socio_origen', 'socio_destino', 'monto_formateado', 'estado', 'fecha', 'saldo_pendiente']
+    list_filter = ['estado', 'fecha']
+    search_fields = ['socio_origen__nombre', 'socio_destino__nombre', 'concepto']
+    autocomplete_fields = ['socio_origen', 'socio_destino', 'registrado_por']
+    date_hierarchy = 'fecha'
+    readonly_fields = ['saldo_pendiente', 'created_at', 'updated_at']
+    fieldsets = [
+        ('Préstamo', {'fields': ['socio_origen', 'socio_destino', 'monto', 'fecha', 'concepto']}),
+        ('Estado', {'fields': ['estado', 'fecha_pago']}),
+        ('Notas', {'fields': ['notas']}),
+        ('Auditoría', {'fields': ['registrado_por', 'saldo_pendiente', 'created_at', 'updated_at'], 'classes': ['collapse']}),
+    ]
+
+    def monto_formateado(self, obj):
+        return f'${obj.monto:,.2f}'
+    monto_formateado.short_description = 'Monto'
+    monto_formateado.admin_order_field = 'monto'
 
     def save_model(self, request, obj, form, change):
         if not obj.pk:

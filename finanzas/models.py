@@ -1,5 +1,8 @@
+from datetime import timedelta
+
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 
 from expedientes.models import Cliente, Expediente
 
@@ -129,6 +132,14 @@ class Expense(models.Model):
     oficina = models.ForeignKey('Office', on_delete=models.PROTECT,
                                  verbose_name='Oficina',
                                  help_text='Oficina a la que pertenece el gasto')
+
+    # Semana de trabajo (opcional)
+    semana = models.ForeignKey(
+        'WorkWeek', on_delete=models.SET_NULL,
+        null=True, blank=True,
+        verbose_name='Semana de trabajo',
+        help_text='Semana a la que pertenece este gasto'
+    )
 
     # Auditoría
     registrado_por = models.ForeignKey(User, on_delete=models.PROTECT,
@@ -387,6 +398,14 @@ class CashMovement(models.Model):
     referencia = models.CharField('Referencia', max_length=200, blank=True,
                                    help_text='Número de expediente, factura o nota relacionada')
 
+    # Semana de trabajo (opcional, para reportes semanales)
+    semana = models.ForeignKey(
+        'WorkWeek', on_delete=models.SET_NULL,
+        null=True, blank=True,
+        verbose_name='Semana de trabajo',
+        help_text='Semana a la que pertenece este movimiento'
+    )
+
     # Auditoría
     registrado_por = models.ForeignKey(User, on_delete=models.PROTECT,
                                        verbose_name='Registrado por',
@@ -423,3 +442,216 @@ class CashMovement(models.Model):
             raise ValidationError({
                 'categoria': 'La categoría seleccionada no corresponde a un egreso.'
             })
+
+
+class Partner(models.Model):
+    """
+    Socios del despacho con participación en utilidades.
+    
+    Cada socio tiene un porcentaje de participación configurable
+    que se usa para distribuir automáticamente las utilidades.
+    """
+
+    nombre = models.CharField('Nombre completo', max_length=200)
+    porcentaje_participacion = models.DecimalField(
+        '% de participación', max_digits=5, decimal_places=2,
+        default=25.00,
+        help_text='Porcentaje de utilidades que le corresponde (ej: 25.00 = 25%%)'
+    )
+    telefono = models.CharField('Teléfono', max_length=15, blank=True)
+    email = models.EmailField('Email', blank=True)
+    activo = models.BooleanField('¿Activo?', default=True,
+                                  help_text='Desmarca para desactivar sin eliminar')
+    notas = models.TextField('Notas', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Socio'
+        verbose_name_plural = 'Socios'
+        ordering = ['nombre']
+
+    def __str__(self):
+        return f'{self.nombre} ({self.porcentaje_participacion}%)'
+
+    @property
+    def prestamos_como_origen(self):
+        """Préstamos que este socio ha otorgado."""
+        return self.prestamos_origen.filter(estado='pendiente')
+
+    @property
+    def prestamos_como_destino(self):
+        """Préstamos que este socio ha recibido."""
+        return self.prestamos_destino.filter(estado='pendiente')
+
+    @property
+    def saldo_prestamos_otorgados(self):
+        """Total de préstamos otorgados (pendientes)."""
+        total = self.prestamos_origen.filter(estado='pendiente').aggregate(
+            t=models.Sum('monto')
+        )['t'] or 0
+        return total
+
+    @property
+    def saldo_prestamos_recibidos(self):
+        """Total de préstamos recibidos (pendientes)."""
+        total = self.prestamos_destino.filter(estado='pendiente').aggregate(
+            t=models.Sum('monto')
+        )['t'] or 0
+        return total
+
+    @property
+    def saldo_neto(self):
+        """Saldo neto: otorgados - recibidos."""
+        return self.saldo_prestamos_otorgados - self.saldo_prestamos_recibidos
+
+
+class WorkWeek(models.Model):
+    """
+    Semana de trabajo del despacho.
+    
+    El sistema gira alrededor de semanas. Cada movimiento (gasto, ingreso,
+    nómina, etc.) pertenece a una semana para facilitar reportes semanales.
+    """
+
+    ESTADO_CHOICES = [
+        ('abierta', 'Abierta'),
+        ('cerrada', 'Cerrada'),
+    ]
+
+    numero = models.PositiveIntegerField('Número de semana',
+                                          help_text='Número de semana del año (1-52)')
+    fecha_inicio = models.DateField('Fecha de inicio')
+    fecha_fin = models.DateField('Fecha de fin')
+    estado = models.CharField('Estado', max_length=10,
+                               choices=ESTADO_CHOICES, default='abierta')
+    notas = models.TextField('Notas', blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Semana de Trabajo'
+        verbose_name_plural = 'Semanas de Trabajo'
+        ordering = ['-fecha_inicio']
+        unique_together = ['numero', 'fecha_inicio']
+        indexes = [
+            models.Index(fields=['fecha_inicio', 'fecha_fin']),
+            models.Index(fields=['estado']),
+        ]
+
+    def __str__(self):
+        inicio = self.fecha_inicio.strftime('%d %b')
+        fin = self.fecha_fin.strftime('%d %b')
+        return f'Semana {self.numero} ({inicio} - {fin})'
+
+    @classmethod
+    def semana_actual(cls):
+        """Retorna la semana activa más reciente, o crea una nueva."""
+        hoy = timezone.now().date()
+        semana = cls.objects.filter(
+            fecha_inicio__lte=hoy, fecha_fin__gte=hoy
+        ).first()
+        if not semana:
+            # Calcular inicio y fin de la semana actual (lunes a domingo)
+            inicio = hoy - timedelta(days=hoy.weekday())
+            fin = inicio + timedelta(days=6)
+            numero = hoy.isocalendar()[1]
+            semana, _ = cls.objects.get_or_create(
+                numero=numero,
+                fecha_inicio=inicio,
+                defaults={'fecha_fin': fin, 'estado': 'abierta'}
+            )
+        return semana
+
+    @property
+    def total_ingresos(self):
+        from django.db.models import Sum
+        from .models import CashMovement, SettlementPayment
+        caja = CashMovement.objects.filter(
+            fecha__gte=self.fecha_inicio, fecha__lte=self.fecha_fin, tipo='ingreso'
+        ).aggregate(t=Sum('monto'))['t'] or 0
+        pagos = SettlementPayment.objects.filter(
+            fecha__gte=self.fecha_inicio, fecha__lte=self.fecha_fin
+        ).aggregate(t=Sum('monto'))['t'] or 0
+        return caja + pagos
+
+    @property
+    def total_gastos(self):
+        from django.db.models import Sum
+        from .models import CashMovement, Expense, Payroll
+        caja = CashMovement.objects.filter(
+            fecha__gte=self.fecha_inicio, fecha__lte=self.fecha_fin, tipo='egreso'
+        ).aggregate(t=Sum('monto'))['t'] or 0
+        gastos = Expense.objects.filter(
+            fecha__gte=self.fecha_inicio, fecha__lte=self.fecha_fin
+        ).aggregate(t=Sum('monto'))['t'] or 0
+        nomina = Payroll.objects.filter(
+            fecha_pago__gte=self.fecha_inicio, fecha_pago__lte=self.fecha_fin
+        ).aggregate(t=Sum('total_pagado'))['t'] or 0
+        return caja + gastos + nomina
+
+    @property
+    def balance(self):
+        return self.total_ingresos - self.total_gastos
+
+
+class PartnerLoan(models.Model):
+    """
+    Préstamos entre socios del despacho.
+    
+    Reemplaza las notas manuales como "Le debo a Hans..."
+    por un registro formal con saldo pendiente.
+    """
+
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('pagado', 'Pagado'),
+        ('cancelado', 'Cancelado'),
+    ]
+
+    socio_origen = models.ForeignKey(
+        'Partner', on_delete=models.PROTECT,
+        related_name='prestamos_origen',
+        verbose_name='Socio que presta (origen)'
+    )
+    socio_destino = models.ForeignKey(
+        'Partner', on_delete=models.PROTECT,
+        related_name='prestamos_destino',
+        verbose_name='Socio que recibe (destino)'
+    )
+    monto = models.DecimalField('Monto', max_digits=12, decimal_places=2)
+    fecha = models.DateField('Fecha')
+    concepto = models.CharField('Concepto', max_length=200,
+                                 help_text='Breve descripción del préstamo')
+    estado = models.CharField('Estado', max_length=15,
+                               choices=ESTADO_CHOICES, default='pendiente')
+    fecha_pago = models.DateField('Fecha de pago', null=True, blank=True)
+    notas = models.TextField('Notas', blank=True)
+
+    # Auditoría
+    registrado_por = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        verbose_name='Registrado por',
+        related_name='prestamos_registrados'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Préstamo entre Socios'
+        verbose_name_plural = 'Préstamos entre Socios'
+        ordering = ['-fecha', '-created_at']
+        indexes = [
+            models.Index(fields=['estado']),
+            models.Index(fields=['socio_origen', 'estado']),
+            models.Index(fields=['socio_destino', 'estado']),
+        ]
+
+    def __str__(self):
+        return f'{self.socio_origen.nombre} → {self.socio_destino.nombre}: ${self.monto:,.2f}'
+
+    @property
+    def saldo_pendiente(self):
+        if self.estado == 'pendiente':
+            return self.monto
+        return 0

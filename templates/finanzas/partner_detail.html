@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}{{ partner.nombre }} - Socios{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-4">
+    <div class="card">
+        <div class="card-header flex items-center justify-between" style="background: #2a3340; color: white; border-bottom: none;">
+            <h1 class="text-sm font-bold">👤 {{ partner.nombre }}</h1>
+            <div class="flex space-x-2">
+                <a href="{% url 'partner_update' partner.pk %}" class="btn btn-sm" style="background:#47505e; color:white;">✏️ Editar</a>
+                <a href="{% url 'partnerloan_create' %}?origen={{ partner.pk }}" class="btn btn-sm" style="background:#1a6b3c; color:white;">💰 Registrar Préstamo</a>
+                <a href="{% url 'partner_list' %}" class="btn btn-sm" style="background:#6b7280; color:white;">← Volver</a>
+            </div>
+        </div>
+        <div class="card-body grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+                <span class="text-[10px] text-gray-500 uppercase">% Participación</span>
+                <p class="text-lg font-bold">{{ partner.porcentaje_participacion }}%</p>
+            </div>
+            <div>
+                <span class="text-[10px] text-gray-500 uppercase">Préstamos Otorgados</span>
+                <p class="text-lg font-bold text-green-700">${{ partner.saldo_prestamos_otorgados|floatformat:2 }}</p>
+            </div>
+            <div>
+                <span class="text-[10px] text-gray-500 uppercase">Préstamos Recibidos</span>
+                <p class="text-lg font-bold text-red-700">${{ partner.saldo_prestamos_recibidos|floatformat:2 }}</p>
+            </div>
+            <div>
+                <span class="text-[10px] text-gray-500 uppercase">Saldo Neto</span>
+                <p class="text-lg font-bold {% if partner.saldo_neto >= 0 %}text-green-700{% else %}text-red-700{% endif %}">
+                    ${{ partner.saldo_neto|floatformat:2 }}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Préstamos Otorgados -->
+        <div class="card">
+            <div class="card-header">💰 Préstamos Otorgados</div>
+            <div class="card-body">
+                {% if prestamos_origen %}
+                <div class="space-y-2">
+                    {% for loan in prestamos_origen %}
+                    <div class="px-3 py-2" style="background: #f5f6f7; border: 1px solid #e8eaed;">
+                        <p class="text-xs font-medium">→ {{ loan.socio_destino.nombre }}</p>
+                        <p class="text-sm font-bold text-green-700">${{ loan.monto|floatformat:2 }}</p>
+                        <p class="text-[10px] text-gray-500">{{ loan.fecha }} · {{ loan.get_estado_display }} · {{ loan.concepto|truncatechars:40 }}</p>
+                    </div>
+                    {% empty %}
+                    <p class="text-gray-400 text-sm text-center py-3">Sin préstamos otorgados.</p>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-gray-400 text-sm text-center py-3">Sin préstamos otorgados.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Préstamos Recibidos -->
+        <div class="card">
+            <div class="card-header">💰 Préstamos Recibidos</div>
+            <div class="card-body">
+                {% if prestamos_destino %}
+                <div class="space-y-2">
+                    {% for loan in prestamos_destino %}
+                    <div class="px-3 py-2" style="background: #f5f6f7; border: 1px solid #e8eaed;">
+                        <p class="text-xs font-medium">← {{ loan.socio_origen.nombre }}</p>
+                        <p class="text-sm font-bold text-red-700">${{ loan.monto|floatformat:2 }}</p>
+                        <p class="text-[10px] text-gray-500">{{ loan.fecha }} · {{ loan.get_estado_display }} · {{ loan.concepto|truncatechars:40 }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-gray-400 text-sm text-center py-3">Sin préstamos recibidos.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

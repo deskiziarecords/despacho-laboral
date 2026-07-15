@@ -8,14 +8,12 @@ from django.db.models import Sum, Q, Count
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect
 from django.utils import timezone
-from django.views.generic import TemplateView
-
 from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+from django.views.generic import TemplateView, ListView, CreateView, UpdateView, DeleteView, DetailView
 from django.contrib import messages
 
-from .models import SettlementPayment, Expense, Commission, CashMovement, Office, Payroll
-from .forms import CashMovementForm
+from .models import SettlementPayment, Expense, Commission, CashMovement, Office, Payroll, Partner, WorkWeek, PartnerLoan
+from .forms import CashMovementForm, PartnerForm, WorkWeekForm, PartnerLoanForm
 from expedientes.models import Expediente
 
 
@@ -392,6 +390,185 @@ class CashMovementDeleteView(LoginRequiredMixin, AdminOrSuperOnlyMixin, DeleteVi
         movimiento = self.get_object()
         messages.success(request, f'✅ Movimiento de {"ingreso" if movimiento.tipo == "ingreso" else "egreso"} eliminado correctamente.')
         return super().delete(request, *args, **kwargs)
+
+
+# ─── CRUD Socios ───────────────────────────────────────────────────────────
+
+
+class PartnerListView(LoginRequiredMixin, AdminOrSuperOnlyMixin, ListView):
+    model = Partner
+    template_name = 'finanzas/partner_list.html'
+    context_object_name = 'partners'
+    paginate_by = 20
+
+    def get_queryset(self):
+        qs = Partner.objects.all().order_by('-activo', 'nombre')
+        q = self.request.GET.get('q', '')
+        if q:
+            qs = qs.filter(nombre__icontains=q)
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filtros'] = {k: v for k, v in self.request.GET.items() if v}
+        return context
+
+
+class PartnerCreateView(LoginRequiredMixin, AdminOrSuperOnlyMixin, CreateView):
+    model = Partner
+    form_class = PartnerForm
+    template_name = 'finanzas/partner_form.html'
+    success_url = reverse_lazy('partner_list')
+
+    def form_valid(self, form):
+        messages.success(self.request, f'✅ Socio {form.instance.nombre} creado correctamente.')
+        return super().form_valid(form)
+
+
+class PartnerUpdateView(LoginRequiredMixin, AdminOrSuperOnlyMixin, UpdateView):
+    model = Partner
+    form_class = PartnerForm
+    template_name = 'finanzas/partner_form.html'
+    success_url = reverse_lazy('partner_list')
+
+    def form_valid(self, form):
+        messages.success(self.request, f'✅ Socio {form.instance.nombre} actualizado correctamente.')
+        return super().form_valid(form)
+
+
+class PartnerDetailView(LoginRequiredMixin, AdminOrSuperOnlyMixin, DetailView):
+    model = Partner
+    template_name = 'finanzas/partner_detail.html'
+    context_object_name = 'partner'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['prestamos_origen'] = self.object.prestamos_origen.select_related(
+            'socio_destino', 'registrado_por'
+        ).order_by('-fecha')[:20]
+        context['prestamos_destino'] = self.object.prestamos_destino.select_related(
+            'socio_origen', 'registrado_por'
+        ).order_by('-fecha')[:20]
+        return context
+
+
+# ─── CRUD Semanas de Trabajo ───────────────────────────────────────────────
+
+
+class WorkWeekListView(LoginRequiredMixin, AdminOrSuperOnlyMixin, ListView):
+    model = WorkWeek
+    template_name = 'finanzas/workweek_list.html'
+    context_object_name = 'weeks'
+    paginate_by = 20
+
+    def get_queryset(self):
+        qs = WorkWeek.objects.all().order_by('-fecha_inicio')
+        estado = self.request.GET.get('estado', '')
+        if estado:
+            qs = qs.filter(estado=estado)
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filtros'] = {k: v for k, v in self.request.GET.items() if v}
+        return context
+
+
+class WorkWeekCreateView(LoginRequiredMixin, AdminOrSuperOnlyMixin, CreateView):
+    model = WorkWeek
+    form_class = WorkWeekForm
+    template_name = 'finanzas/workweek_form.html'
+    success_url = reverse_lazy('workweek_list')
+
+    def get_initial(self):
+        initial = super().get_initial()
+        from datetime import date, timedelta
+        hoy = date.today()
+        inicio = hoy - timedelta(days=hoy.weekday())
+        fin = inicio + timedelta(days=6)
+        initial['numero'] = hoy.isocalendar()[1]
+        initial['fecha_inicio'] = inicio
+        initial['fecha_fin'] = fin
+        return initial
+
+    def form_valid(self, form):
+        messages.success(self.request, f'✅ Semana {form.instance.numero} creada correctamente.')
+        return super().form_valid(form)
+
+
+class WorkWeekUpdateView(LoginRequiredMixin, AdminOrSuperOnlyMixin, UpdateView):
+    model = WorkWeek
+    form_class = WorkWeekForm
+    template_name = 'finanzas/workweek_form.html'
+    success_url = reverse_lazy('workweek_list')
+
+    def form_valid(self, form):
+        messages.success(self.request, f'✅ Semana {form.instance.numero} actualizada correctamente.')
+        return super().form_valid(form)
+
+
+# ─── CRUD Préstamos entre Socios ───────────────────────────────────────────
+
+
+class PartnerLoanListView(LoginRequiredMixin, AdminOrSuperOnlyMixin, ListView):
+    model = PartnerLoan
+    template_name = 'finanzas/partnerloan_list.html'
+    context_object_name = 'loans'
+    paginate_by = 20
+
+    def get_queryset(self):
+        qs = PartnerLoan.objects.select_related(
+            'socio_origen', 'socio_destino', 'registrado_por'
+        ).order_by('-fecha', '-created_at')
+
+        estado = self.request.GET.get('estado', '')
+        socio = self.request.GET.get('socio', '')
+
+        if estado:
+            qs = qs.filter(estado=estado)
+        if socio:
+            qs = qs.filter(
+                Q(socio_origen_id=socio) | Q(socio_destino_id=socio)
+            )
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filtros'] = {k: v for k, v in self.request.GET.items() if v}
+        context['socios'] = Partner.objects.filter(activo=True)
+
+        # Totales
+        qs = self.get_queryset()
+        context['total_pendiente'] = qs.filter(estado='pendiente').aggregate(
+            t=models.Sum('monto')
+        )['t'] or 0
+        context['total_pagado'] = qs.filter(estado='pagado').aggregate(
+            t=models.Sum('monto')
+        )['t'] or 0
+        return context
+
+
+class PartnerLoanCreateView(LoginRequiredMixin, AdminOrSuperOnlyMixin, CreateView):
+    model = PartnerLoan
+    form_class = PartnerLoanForm
+    template_name = 'finanzas/partnerloan_form.html'
+    success_url = reverse_lazy('partnerloan_list')
+
+    def form_valid(self, form):
+        form.instance.registrado_por = self.request.user
+        messages.success(self.request, '✅ Préstamo registrado correctamente.')
+        return super().form_valid(form)
+
+
+class PartnerLoanUpdateView(LoginRequiredMixin, AdminOrSuperOnlyMixin, UpdateView):
+    model = PartnerLoan
+    form_class = PartnerLoanForm
+    template_name = 'finanzas/partnerloan_form.html'
+    success_url = reverse_lazy('partnerloan_list')
+
+    def form_valid(self, form):
+        messages.success(self.request, '✅ Préstamo actualizado correctamente.')
+        return super().form_valid(form)
 
 
 @login_required
