@@ -650,12 +650,32 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             _btn_click(page, 'enviar solicitud')
             page.wait_for_timeout(2500)
 
-            # Click "Enviar" (confirmación)
+            # Click "Enviar" (confirmación del SweetAlert/modal)
             logger.info('[7b] Confirmando envío...')
             _btn_click(page, 'enviar')
-            page.wait_for_timeout(4000)
 
-            # Cerrar modal de éxito
+            # ═══ CRÍTICO ═══════════════════════════════════════════
+            # El clic en "Enviar" envía el formulario y el portal
+            # navega a una nueva página (resultado/confirmación).
+            # Esto DESTRUYE el contexto de ejecución anterior, por
+            # lo que NO se puede usar page.evaluate() hasta que
+            # la nueva página termine de cargar.
+            #
+            # wait_for_timeout() no sirve aquí porque la navegación
+            # puede tardar variable. Usamos wait_for_load_state().
+            # ═══════════════════════════════════════════════════════
+            try:
+                page.wait_for_load_state('networkidle', timeout=20000)
+                logger.info('[7b] Navegación completada después del envío')
+            except Exception as nav_err:
+                logger.warning('[7b] La navegación no se detectó por wait_for_load_state: %s', nav_err)
+                # Fallback: esperar un momento
+                page.wait_for_timeout(2000)
+
+            # Pequeña pausa para que el DOM termine de renderizar
+            page.wait_for_timeout(1000)
+
+            # Cerrar modal de éxito (ahora en la NUEVA página)
             _cerrar_modales(page)
             page.wait_for_timeout(500)
             checkpoint('07_enviado')
@@ -673,7 +693,11 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             page.wait_for_timeout(1000)
 
             # Esperar a que termine la descarga
-            page.wait_for_timeout(3000)
+            try:
+                page.wait_for_load_state('networkidle', timeout=10000)
+            except Exception:
+                pass
+            page.wait_for_timeout(1500)
 
             # ── Extraer folio del PDF descargado ──────────────────────
             logger.info('[Folio] Buscando PDF descargado...')
