@@ -1947,7 +1947,7 @@ def enviar_conciliacion_automation(request, pk):
             hilo = threading.Thread(
                 target=_ejecutar_conciliacion_en_hilo,
                 args=(task.pk,),
-                daemon=True,
+                daemon=False,  # Non-daemon: sobrevive si Gunicorn recicla el worker
             )
             hilo.start()
 
@@ -2054,7 +2054,7 @@ def reintentar_conciliacion(request, task_pk):
         hilo = threading.Thread(
             target=_ejecutar_conciliacion_en_hilo,
             args=(task.pk,),
-            daemon=True,
+            daemon=False,  # Non-daemon: sobrevive si Gunicorn recicla el worker
         )
         hilo.start()
 

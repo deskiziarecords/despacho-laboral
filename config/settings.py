@@ -169,8 +169,16 @@ CELERY_TASK_TIME_LIMIT = 5 * 60  # 5 minutos máximo para tareas
 
 # Flag para saber si Celery está disponible
 def _celery_disponible():
-    """Verifica si hay configuración de Redis disponible."""
-    return bool(os.environ.get('REDIS_URL') or os.environ.get('REDISHOST'))
+    """
+    Verifica si hay un worker de Celery activo.
+
+    Requiere CELERY_WORKER_ENABLED=true además de Redis, para evitar el caso
+    donde Railway inyecta REDIS_URL (ej. para caché) pero no hay worker corriendo
+    y las tareas se quedan en 'pendiente' para siempre.
+    """
+    worker_enabled = os.environ.get('CELERY_WORKER_ENABLED', '').lower() == 'true'
+    has_redis = bool(os.environ.get('REDIS_URL') or os.environ.get('REDISHOST'))
+    return worker_enabled and has_redis
 
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
