@@ -226,6 +226,188 @@ class Commission(models.Model):
         super().save(*args, **kwargs)
 
 
+class Agreement(models.Model):
+    """
+    Convenio del despacho con un cliente.
+    
+    Registra los acuerdos (convenios) cerrados con clientes,
+    incluyendo el monto, honorarios generados y seguimiento de pago.
+    """
+
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente de firma'),
+        ('firmado', 'Firmado'),
+        ('pagado', 'Pagado'),
+        ('parcial', 'Pagado parcialmente'),
+        ('cancelado', 'Cancelado'),
+    ]
+
+    cliente = models.ForeignKey(
+        'expedientes.Cliente', on_delete=models.PROTECT,
+        verbose_name='Cliente',
+        help_text='Cliente con quien se firma el convenio'
+    )
+    empresa = models.CharField(
+        'Empresa o contraparte', max_length=200, blank=True,
+        help_text='Nombre de la empresa o persona con quien se firma el convenio'
+    )
+    oficina = models.ForeignKey(
+        'Office', on_delete=models.PROTECT,
+        verbose_name='Oficina',
+        help_text='Oficina responsable del convenio'
+    )
+    fecha = models.DateField('Fecha del convenio')
+    monto_convenio = models.DecimalField(
+        'Monto del convenio', max_digits=12, decimal_places=2,
+        help_text='Monto total acordado en el convenio'
+    )
+    honorarios = models.DecimalField(
+        'Honorarios totales', max_digits=12, decimal_places=2,
+        default=0,
+        help_text='Suma total de honorarios generados (se calcula automáticamente al guardar)'
+    )
+    estado = models.CharField(
+        'Estado', max_length=15,
+        choices=ESTADO_CHOICES, default='pendiente'
+    )
+    responsable = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        verbose_name='Responsable',
+        related_name='convenios_responsable',
+        help_text='Abogado o asesor responsable del convenio'
+    )
+    notas = models.TextField('Notas / Observaciones', blank=True)
+
+    # Auditoría
+    creado_por = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        verbose_name='Creado por',
+        related_name='convenios_creados'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Convenio'
+        verbose_name_plural = 'Convenios'
+        ordering = ['-fecha', '-created_at']
+        indexes = [
+            models.Index(fields=['fecha']),
+            models.Index(fields=['estado']),
+            models.Index(fields=['oficina', 'fecha']),
+            models.Index(fields=['responsable', 'estado']),
+        ]
+
+    def __str__(self):
+        return f'Convenio {self.cliente.nombre} - ${self.monto_convenio:,.2f} ({self.get_estado_display()})'
+
+    def save(self, *args, **kwargs):
+        # Recalcular honorarios totales a partir de los honorarios relacionados
+        is_new = not self.pk
+        super().save(*args, **kwargs)  # Guardar primero para tener PK
+        if not is_new:
+            # Actualizar la suma de honorarios
+            total = self.honorario_set.aggregate(t=models.Sum('monto_calculado'))['t'] or 0
+            if self.honorarios != total:
+                Agreement.objects.filter(pk=self.pk).update(honorarios=total)
+
+    @property
+    def honorarios_pendientes(self):
+        """Honorarios aún no pagados."""
+        total = self.honorario_set.filter(estado='pendiente').aggregate(
+            t=models.Sum('monto_calculado')
+        )['t'] or 0
+        return total
+
+    @property
+    def honorarios_pagados(self):
+        """Honorarios ya pagados."""
+        total = self.honorario_set.filter(estado='pagado').aggregate(
+            t=models.Sum('monto_calculado')
+        )['t'] or 0
+        return total
+
+
+class Honorario(models.Model):
+    """
+    Honorario generado por un convenio.
+    
+    Cada convenio puede generar uno o varios honorarios con diferentes
+    porcentajes. El sistema calcula automáticamente el monto basado
+    en el porcentaje configurado y el monto del convenio.
+    """
+
+    ESTADO_CHOICES = [
+        ('pendiente', 'Pendiente'),
+        ('pagado', 'Pagado'),
+        ('cancelado', 'Cancelado'),
+    ]
+
+    PORCENTAJE_CHOICES = [
+        (30.00, '30% (Tarifa general)'),
+        (35.00, '35% (Tarifa especial)'),
+        (40.00, '40% (Tarifa preferente)'),
+        (25.00, '25% (Tarifa reducida)'),
+        (50.00, '50% (Tarifa alta)'),
+    ]
+
+    convenio = models.ForeignKey(
+        'Agreement', on_delete=models.CASCADE,
+        verbose_name='Convenio',
+        related_name='honorario_set'
+    )
+    porcentaje = models.DecimalField(
+        'Porcentaje', max_digits=5, decimal_places=2,
+        choices=PORCENTAJE_CHOICES, default=30.00,
+        help_text='Porcentaje de honorarios sobre el monto del convenio'
+    )
+    monto_calculado = models.DecimalField(
+        'Monto calculado', max_digits=12, decimal_places=2,
+        editable=False,
+        help_text='Calculado automáticamente: monto_del_convenio × porcentaje ÷ 100'
+    )
+    fecha_estimada = models.DateField(
+        'Fecha estimada de pago', null=True, blank=True
+    )
+    fecha_pagado = models.DateField(
+        'Fecha de pago', null=True, blank=True
+    )
+    estado = models.CharField(
+        'Estado', max_length=15,
+        choices=ESTADO_CHOICES, default='pendiente'
+    )
+    notas = models.TextField('Notas', blank=True)
+
+    # Auditoría
+    registrado_por = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        verbose_name='Registrado por',
+        related_name='honorarios_registrados'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Honorario'
+        verbose_name_plural = 'Honorarios'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['estado']),
+            models.Index(fields=['convenio', 'estado']),
+        ]
+
+    def __str__(self):
+        return f'{self.convenio.cliente.nombre} - {self.porcentaje}% = ${self.monto_calculado:,.2f}'
+
+    def save(self, *args, **kwargs):
+        # Calcular automáticamente el monto
+        self.monto_calculado = self.convenio.monto_convenio * self.porcentaje / 100
+        super().save(*args, **kwargs)
+        # Actualizar el total de honorarios en el convenio
+        total = self.convenio.honorario_set.aggregate(t=models.Sum('monto_calculado'))['t'] or 0
+        Agreement.objects.filter(pk=self.convenio.pk).update(honorarios=total)
+
+
 class Employee(models.Model):
     """
     Catálogo de empleados del despacho.

@@ -12,8 +12,8 @@ from django.urls import reverse_lazy
 from django.views.generic import TemplateView, ListView, CreateView, UpdateView, DeleteView, DetailView
 from django.contrib import messages
 
-from .models import SettlementPayment, Expense, Commission, CashMovement, Office, Payroll, Partner, WorkWeek, PartnerLoan
-from .forms import CashMovementForm, PartnerForm, WorkWeekForm, PartnerLoanForm
+from .models import SettlementPayment, Expense, Commission, CashMovement, Office, Payroll, Partner, WorkWeek, PartnerLoan, Agreement, Honorario
+from .forms import CashMovementForm, PartnerForm, WorkWeekForm, PartnerLoanForm, AgreementForm, HonorarioForm
 from expedientes.models import Expediente
 
 
@@ -505,6 +505,155 @@ class WorkWeekUpdateView(LoginRequiredMixin, AdminOrSuperOnlyMixin, UpdateView):
     def form_valid(self, form):
         messages.success(self.request, f'✅ Semana {form.instance.numero} actualizada correctamente.')
         return super().form_valid(form)
+
+
+# ─── CRUD Convenios (Agreements) ─────────────────────────────────────────
+
+
+class AgreementListView(LoginRequiredMixin, AdminOrSuperOnlyMixin, ListView):
+    model = Agreement
+    template_name = 'finanzas/agreement_list.html'
+    context_object_name = 'agreements'
+    paginate_by = 20
+
+    def get_queryset(self):
+        qs = Agreement.objects.select_related(
+            'cliente', 'oficina', 'responsable', 'creado_por'
+        ).order_by('-fecha', '-created_at')
+
+        estado = self.request.GET.get('estado', '')
+        oficina_id = self.request.GET.get('oficina', '')
+        q = self.request.GET.get('q', '')
+
+        if estado:
+            qs = qs.filter(estado=estado)
+        if oficina_id:
+            qs = qs.filter(oficina_id=oficina_id)
+        if q:
+            qs = qs.filter(
+                Q(cliente__nombre__icontains=q) |
+                Q(empresa__icontains=q) |
+                Q(notas__icontains=q)
+            )
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['oficinas'] = Office.objects.filter(activa=True)
+        context['filtros'] = {k: v for k, v in self.request.GET.items() if v and k != 'page'}
+        context['estado_choices'] = Agreement.ESTADO_CHOICES
+
+        # Totales
+        qs = self.get_queryset()
+        totales = qs.aggregate(
+            total_monto=Sum('monto_convenio'),
+            total_honorarios=Sum('honorarios'),
+            pendientes=Count('pk', filter=Q(estado='pendiente')),
+            pagados=Count('pk', filter=Q(estado='pagado')),
+        )
+        context['total_monto'] = totales['total_monto'] or 0
+        context['total_honorarios'] = totales['total_honorarios'] or 0
+        context['pendientes_count'] = totales['pendientes'] or 0
+        context['pagados_count'] = totales['pagados'] or 0
+        context['total_agreements'] = qs.count()
+
+        return context
+
+
+class AgreementCreateView(LoginRequiredMixin, AdminOrSuperOnlyMixin, CreateView):
+    model = Agreement
+    form_class = AgreementForm
+    template_name = 'finanzas/agreement_form.html'
+    success_url = reverse_lazy('agreement_list')
+
+    def form_valid(self, form):
+        form.instance.creado_por = self.request.user
+        messages.success(self.request, f'✅ Convenio de {form.instance.cliente.nombre} creado correctamente.')
+        return super().form_valid(form)
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial['fecha'] = timezone.now().date()
+        initial['responsable'] = self.request.user
+        return initial
+
+
+class AgreementUpdateView(LoginRequiredMixin, AdminOrSuperOnlyMixin, UpdateView):
+    model = Agreement
+    form_class = AgreementForm
+    template_name = 'finanzas/agreement_form.html'
+    success_url = reverse_lazy('agreement_list')
+
+    def form_valid(self, form):
+        messages.success(self.request, f'✅ Convenio de {form.instance.cliente.nombre} actualizado correctamente.')
+        return super().form_valid(form)
+
+
+class AgreementDetailView(LoginRequiredMixin, AdminOrSuperOnlyMixin, DetailView):
+    model = Agreement
+    template_name = 'finanzas/agreement_detail.html'
+    context_object_name = 'agreement'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['honorarios'] = self.object.honorario_set.select_related(
+            'registrado_por'
+        ).order_by('-created_at')
+        context['total_honorarios_pendientes'] = self.object.honorarios_pendientes
+        context['total_honorarios_pagados'] = self.object.honorarios_pagados
+        context['pagos'] = SettlementPayment.objects.filter(
+            cliente=self.object.cliente
+        ).order_by('-fecha')[:10]
+        return context
+
+
+# ─── CRUD Honorarios ───────────────────────────────────────────────────────
+
+
+class HonorarioCreateView(LoginRequiredMixin, AdminOrSuperOnlyMixin, CreateView):
+    model = Honorario
+    form_class = HonorarioForm
+    template_name = 'finanzas/honorario_form.html'
+    success_url = reverse_lazy('agreement_list')
+
+    def get_initial(self):
+        initial = super().get_initial()
+        convenio_id = self.request.GET.get('convenio')
+        if convenio_id:
+            try:
+                initial['convenio'] = int(convenio_id)
+            except (ValueError, TypeError):
+                pass
+        return initial
+
+    def form_valid(self, form):
+        form.instance.registrado_por = self.request.user
+        messages.success(
+            self.request,
+            f'✅ Honorario de {form.instance.porcentaje}% creado correctamente. '
+            f'Monto calculado: ${form.instance.monto_calculado:,.2f}'
+        )
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        if self.object:
+            return reverse_lazy('agreement_detail', kwargs={'pk': self.object.convenio.pk})
+        return reverse_lazy('agreement_list')
+
+
+class HonorarioUpdateView(LoginRequiredMixin, AdminOrSuperOnlyMixin, UpdateView):
+    model = Honorario
+    form_class = HonorarioForm
+    template_name = 'finanzas/honorario_form.html'
+
+    def form_valid(self, form):
+        messages.success(self.request, f'✅ Honorario actualizado correctamente.')
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        if self.object:
+            return reverse_lazy('agreement_detail', kwargs={'pk': self.object.convenio.pk})
+        return reverse_lazy('agreement_list')
 
 
 # ─── CRUD Préstamos entre Socios ───────────────────────────────────────────

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils import timezone
-from .models import Office, SettlementPayment, Expense, Commission, Employee, Payroll, CashMovement, Partner, WorkWeek, PartnerLoan
+from .models import Office, SettlementPayment, Expense, Commission, Employee, Payroll, CashMovement, Partner, WorkWeek, PartnerLoan, Agreement, Honorario
 
 
 @admin.register(Office)
@@ -264,6 +264,92 @@ class PartnerLoanAdmin(admin.ModelAdmin):
         return f'${obj.monto:,.2f}'
     monto_formateado.short_description = 'Monto'
     monto_formateado.admin_order_field = 'monto'
+
+    def save_model(self, request, obj, form, change):
+        if not obj.pk:
+            if not obj.registrado_por_id:
+                obj.registrado_por = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(Agreement)
+class AgreementAdmin(admin.ModelAdmin):
+    list_display = ['fecha', 'cliente', 'monto_convenio_formateado', 'honorarios_formateado', 'estado', 'oficina', 'responsable']
+    list_filter = ['estado', 'oficina', 'fecha']
+    search_fields = ['cliente__nombre', 'empresa', 'notas']
+    date_hierarchy = 'fecha'
+    autocomplete_fields = ['cliente', 'oficina', 'responsable', 'creado_por']
+    readonly_fields = ['honorarios', 'created_at', 'updated_at', 'honorarios_pendientes', 'honorarios_pagados']
+    list_editable = ['estado']
+    fieldsets = [
+        ('Información del Convenio', {
+            'fields': ['cliente', 'empresa', 'oficina', 'fecha', 'responsable']
+        }),
+        ('Montos', {
+            'fields': ['monto_convenio', 'honorarios', 'honorarios_pendientes', 'honorarios_pagados'],
+            'description': 'Los honorarios se calculan automáticamente a partir de los honorarios registrados.'
+        }),
+        ('Estado', {
+            'fields': ['estado']
+        }),
+        ('Notas', {
+            'fields': ['notas']
+        }),
+        ('Auditoría', {
+            'fields': ['creado_por', 'created_at', 'updated_at'],
+            'classes': ['collapse']
+        }),
+    ]
+
+    def monto_convenio_formateado(self, obj):
+        return f'${obj.monto_convenio:,.2f}'
+    monto_convenio_formateado.short_description = 'Monto Convenio'
+    monto_convenio_formateado.admin_order_field = 'monto_convenio'
+
+    def honorarios_formateado(self, obj):
+        return f'${obj.honorarios:,.2f}'
+    honorarios_formateado.short_description = 'Honorarios'
+    honorarios_formateado.admin_order_field = 'honorarios'
+
+    def save_model(self, request, obj, form, change):
+        if not obj.pk:
+            if not obj.creado_por_id:
+                obj.creado_por = request.user
+        super().save_model(request, obj, form, change)
+
+
+@admin.register(Honorario)
+class HonorarioAdmin(admin.ModelAdmin):
+    list_display = ['convenio', 'porcentaje', 'monto_calculado_formateado', 'estado', 'fecha_estimada', 'fecha_pagado']
+    list_filter = ['estado', 'porcentaje']
+    search_fields = ['convenio__cliente__nombre', 'notas']
+    autocomplete_fields = ['convenio', 'registrado_por']
+    readonly_fields = ['monto_calculado', 'created_at', 'updated_at']
+    list_editable = ['estado']
+    fieldsets = [
+        ('Información del Honorario', {
+            'fields': ['convenio', 'porcentaje', 'monto_calculado'],
+            'description': 'El monto se calcula automáticamente: monto_del_convenio × porcentaje ÷ 100'
+        }),
+        ('Fechas', {
+            'fields': ['fecha_estimada', 'fecha_pagado']
+        }),
+        ('Estado', {
+            'fields': ['estado']
+        }),
+        ('Notas', {
+            'fields': ['notas']
+        }),
+        ('Auditoría', {
+            'fields': ['registrado_por', 'created_at', 'updated_at'],
+            'classes': ['collapse']
+        }),
+    ]
+
+    def monto_calculado_formateado(self, obj):
+        return f'${obj.monto_calculado:,.2f}'
+    monto_calculado_formateado.short_description = 'Monto'
+    monto_calculado_formateado.admin_order_field = 'monto_calculado'
 
     def save_model(self, request, obj, form, change):
         if not obj.pk:

@@ -1,5 +1,47 @@
 from django import forms
-from .models import CashMovement, Office, Partner, WorkWeek, PartnerLoan
+from django.contrib.auth.models import User
+from .models import CashMovement, Office, Partner, WorkWeek, PartnerLoan, Agreement, Honorario
+
+
+class AgreementForm(forms.ModelForm):
+    class Meta:
+        model = Agreement
+        fields = ['cliente', 'empresa', 'oficina', 'fecha', 'monto_convenio', 'estado', 'responsable', 'notas']
+        widgets = {
+            'cliente': forms.Select(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
+            'empresa': forms.TextInput(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500', 'placeholder': 'Nombre de la empresa o contraparte'}),
+            'oficina': forms.Select(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
+            'fecha': forms.DateInput(attrs={'type': 'date', 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
+            'monto_convenio': forms.NumberInput(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500', 'step': '0.01', 'placeholder': '0.00'}),
+            'estado': forms.Select(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
+            'responsable': forms.Select(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
+            'notas': forms.Textarea(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500', 'rows': 3, 'placeholder': 'Observaciones del convenio...'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['oficina'].queryset = Office.objects.filter(activa=True)
+        self.fields['responsable'].queryset = User.objects.filter(is_active=True)
+        from expedientes.models import Cliente
+        self.fields['cliente'].queryset = Cliente.objects.all().order_by('nombre')
+
+
+class HonorarioForm(forms.ModelForm):
+    class Meta:
+        model = Honorario
+        fields = ['convenio', 'porcentaje', 'fecha_estimada', 'fecha_pagado', 'estado', 'notas']
+        widgets = {
+            'convenio': forms.Select(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
+            'porcentaje': forms.Select(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
+            'fecha_estimada': forms.DateInput(attrs={'type': 'date', 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
+            'fecha_pagado': forms.DateInput(attrs={'type': 'date', 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
+            'estado': forms.Select(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500'}),
+            'notas': forms.Textarea(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500', 'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['convenio'].queryset = Agreement.objects.all().order_by('-fecha')
 
 
 class CashMovementForm(forms.ModelForm):

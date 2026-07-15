@@ -27,4 +27,14 @@ urlpatterns = [
     path('prestamos/', views.PartnerLoanListView.as_view(), name='partnerloan_list'),
     path('prestamos/nuevo/', views.PartnerLoanCreateView.as_view(), name='partnerloan_create'),
     path('prestamos/<int:pk>/editar/', views.PartnerLoanUpdateView.as_view(), name='partnerloan_update'),
+
+    # CRUD Convenios
+    path('convenios/', views.AgreementListView.as_view(), name='agreement_list'),
+    path('convenios/nuevo/', views.AgreementCreateView.as_view(), name='agreement_create'),
+    path('convenios/<int:pk>/', views.AgreementDetailView.as_view(), name='agreement_detail'),
+    path('convenios/<int:pk>/editar/', views.AgreementUpdateView.as_view(), name='agreement_update'),
+
+    # CRUD Honorarios
+    path('honorarios/nuevo/', views.HonorarioCreateView.as_view(), name='honorario_create'),
+    path('honorarios/<int:pk>/editar/', views.HonorarioUpdateView.as_view(), name='honorario_update'),
 ]
