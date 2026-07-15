@@ -154,4 +154,23 @@ if EMAIL_BACKEND == 'django.core.mail.backends.smtp.EmailBackend':
     EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
     DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL')
 
+# ─── Celery / Redis ────────────────────────────────────
+# Railway inyecta REDIS_URL automáticamente al agregar Redis
+# Si no hay Redis configurado, Celery se desactiva y se usa threading como fallback
+# (útil para desarrollo local sin Redis)
+CELERY_BROKER_URL = os.environ.get('REDIS_URL', '')
+CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', '')
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'America/Mexico_City'
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 5 * 60  # 5 minutos máximo para tareas
+
+# Flag para saber si Celery está disponible
+def _celery_disponible():
+    """Verifica si hay configuración de Redis disponible."""
+    return bool(os.environ.get('REDIS_URL') or os.environ.get('REDISHOST'))
+
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

@@ -71,9 +71,19 @@ uv run python manage.py crear_usuarios_prueba 2>&1 || echo ">>> (Aviso: no se pu
 echo ">>> Sembrando datos de prueba..."
 uv run python manage.py seed_datos 2>&1 || echo ">>> (Aviso: no se pudieron sembrar datos de prueba — consulta los logs para más detalles)"
 
-# 7. Iniciar Gunicorn
-echo ">>> Iniciando Gunicorn en 0.0.0.0:${PORT:-8000}..."
-exec uv run gunicorn config.wsgi:application \
-    --bind "0.0.0.0:${PORT:-8000}" \
-    --workers 3 \
-    --timeout 120
+# 7. Iniciar servicio según SERVICE_TYPE
+# SERVICE_TYPE=worker → Celery Worker
+# SERVICE_TYPE=web o por defecto → Gunicorn
+if [ "${SERVICE_TYPE:-web}" = "worker" ]; then
+    echo ">>> Iniciando Celery Worker..."
+    exec uv run celery -A config worker --loglevel=info --concurrency=1
+elif [ "${SERVICE_TYPE:-web}" = "beat" ]; then
+    echo ">>> Iniciando Celery Beat..."
+    exec uv run celery -A config beat --loglevel=info
+else
+    echo ">>> Iniciando Gunicorn en 0.0.0.0:${PORT:-8000}..."
+    exec uv run gunicorn config.wsgi:application \
+        --bind "0.0.0.0:${PORT:-8000}" \
+        --workers 3 \
+        --timeout 120
+fi

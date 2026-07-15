@@ -66,6 +66,8 @@ def _get_machotes_queryset():
     return Machote.objects.filter(activo=True).order_by('-favorito', 'orden', 'nombre')
 from core.laboral.calculators import simular
 from .conciliacion_automation import enviar_y_guardar as enviar_conciliacion
+from .tasks import ejecutar_conciliacion as ejecutar_conciliacion_task
+from config.settings import _celery_disponible
 
 
 # ─── Mixins ────────────────────────────────────────────────────────────────
@@ -1939,12 +1941,15 @@ def enviar_conciliacion_automation(request, pk):
         )
 
         # Iniciar la ejecución en un hilo separado
-        hilo = threading.Thread(
-            target=_ejecutar_conciliacion_en_hilo,
-            args=(task.pk,),
-            daemon=True,
-        )
-        hilo.start()
+        if _celery_disponible():
+            ejecutar_conciliacion_task.delay(task.pk)
+        else:
+            hilo = threading.Thread(
+                target=_ejecutar_conciliacion_en_hilo,
+                args=(task.pk,),
+                daemon=True,
+            )
+            hilo.start()
 
         messages.info(request, '🚀 Iniciando envío automático al portal de conciliación...')
         return redirect('conciliacion_procesando', task_pk=task.pk)
@@ -2043,12 +2048,15 @@ def reintentar_conciliacion(request, task_pk):
     )
 
     # Iniciar la ejecución en un hilo separado
-    hilo = threading.Thread(
-        target=_ejecutar_conciliacion_en_hilo,
-        args=(task.pk,),
-        daemon=True,
-    )
-    hilo.start()
+    if _celery_disponible():
+        ejecutar_conciliacion_task.delay(task.pk)
+    else:
+        hilo = threading.Thread(
+            target=_ejecutar_conciliacion_en_hilo,
+            args=(task.pk,),
+            daemon=True,
+        )
+        hilo.start()
 
     messages.info(request, '🚀 Reintentando envío automático al portal de conciliación...')
     return redirect('conciliacion_procesando', task_pk=task.pk)
