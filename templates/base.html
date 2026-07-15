@@ -570,5 +570,72 @@
     </script>
 
     {% block extra_scripts %}{% endblock %}
+
+    <script>
+    // ─── Toast de conciliación exitosa ──────────────────────────────────
+    // Detecta si venimos de una conciliación exitosa (query params) y muestra un toast
+    (function() {
+        // Escape HTML entities for safe innerHTML
+        function esc(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('conciliacion_ok') === '1') {
+            var folio = esc(params.get('folio') || 'N/A');
+            var tiempo = esc(params.get('tiempo') || '');
+
+            // Crear el toast
+            var toast = document.createElement('div');
+            toast.id = 'toast-conciliacion';
+            toast.style.cssText = [
+                'position: fixed',
+                'top: 16px',
+                'right: 16px',
+                'z-index: 9999',
+                'background: #065f46',
+                'color: white',
+                'padding: 12px 16px',
+                'border-radius: 4px',
+                'box-shadow: 0 4px 12px rgba(0,0,0,0.2)',
+                'max-width: 380px',
+                'font-size: 13px',
+                'line-height: 1.4',
+                'opacity: 0',
+                'transform: translateY(-10px)',
+                'transition: opacity 0.3s ease, transform 0.3s ease',
+            ].join(';');
+
+            toast.innerHTML = '<div style="display:flex;align-items:flex-start;gap:10px;">' +
+                '<span style="font-size:20px;flex-shrink:0;">✅</span>' +
+                '<div>' +
+                '<div style="font-weight:700;margin-bottom:2px;">Solicitud de Conciliación Enviada</div>' +
+                '<div style="font-size:12px;opacity:0.9;">Folio: <strong>' + folio + '</strong></div>' +
+                (tiempo ? '<div style="font-size:11px;opacity:0.75;margin-top:2px;">⏱ ' + tiempo + '</div>' : '') +
+                '</div>' +
+                '<button onclick="this.parentElement.parentElement.remove()" style="background:none;border:none;color:rgba(255,255,255,0.7);cursor:pointer;font-size:16px;padding:0 2px;flex-shrink:0;">✕</button>' +
+                '</div>';
+
+            document.body.appendChild(toast);
+
+            // Animar entrada
+            requestAnimationFrame(function() {
+                toast.style.opacity = '1';
+                toast.style.transform = 'translateY(0)';
+            });
+
+            // Auto-dismiss después de 6 segundos
+            setTimeout(function() {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-10px)';
+                setTimeout(function() { toast.remove(); }, 300);
+            }, 6000);
+
+            // Limpiar query params de la URL sin recargar la página
+            if (window.history.replaceState) {
+                var cleanUrl = window.location.pathname + window.location.hash;
+                window.history.replaceState({}, document.title, cleanUrl);
+            }
+        }
+    })();
+    </script>
 </body>
 </html>

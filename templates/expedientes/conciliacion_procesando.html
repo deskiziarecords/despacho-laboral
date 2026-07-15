@@ -202,7 +202,9 @@
             document.getElementById('result-time').textContent = elapsed < 60 ? elapsed + 's' : Math.floor(elapsed / 60) + 'm ' + (elapsed % 60) + 's';
             // Auto-redirigir al expediente después de 3 segundos
             setTimeout(function() {
-                window.location.href = EXPEDIENTE_URL;
+                var folio = data.folio || 'N/A';
+                var elapsed = document.getElementById('result-time').textContent || '';
+                window.location.href = EXPEDIENTE_URL + '?conciliacion_ok=1&folio=' + encodeURIComponent(folio) + '&tiempo=' + encodeURIComponent(elapsed);
             }, 3000);
         } else if (data.estado === 'fallido') {
             loadingState.classList.add('hidden');
