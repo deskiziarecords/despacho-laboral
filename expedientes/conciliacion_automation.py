@@ -650,27 +650,53 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             _btn_click(page, 'enviar solicitud')
             page.wait_for_timeout(2500)
 
-            # Click "Enviar" (confirmación del SweetAlert/modal)
-            logger.info('[7b] Confirmando envío...')
-            _btn_click(page, 'enviar')
-
             # ═══ CRÍTICO ═══════════════════════════════════════════
-            # El clic en "Enviar" envía el formulario y el portal
-            # navega a una nueva página (resultado/confirmación).
-            # Esto DESTRUYE el contexto de ejecución anterior, por
-            # lo que NO se puede usar page.evaluate() hasta que
-            # la nueva página termine de cargar.
+            # Click en "Enviar" (SweetAlert confirmación).
             #
-            # wait_for_timeout() no sirve aquí porque la navegación
-            # puede tardar variable. Usamos wait_for_load_state().
+            # Este clic envía el formulario y el portal navega a una
+            # página de resultado. La navegación DESTRUYE el contexto
+            # de ejecución anterior.
+            #
+            # Usamos expect_navigation() para:
+            #  1. Crear un watcher de navegación ANTES de hacer clic
+            #  2. Hacer clic (que dispara la navegación)
+            #  3. Esperar a que la navegación termine completamente
+            #
+            # Esto evita que page.evaluate() se ejecute sobre un
+            # contexto destruido.
             # ═══════════════════════════════════════════════════════
+            logger.info('[7b] Confirmando envío con expect_navigation...')
+
+            # Primero intentar con Playwright nativo (no evaluate)
+            navegacion_completa = False
             try:
-                page.wait_for_load_state('networkidle', timeout=20000)
-                logger.info('[7b] Navegación completada después del envío')
+                with page.expect_navigation(timeout=25000):
+                    # Intentar clic nativo primero
+                    btn_envio = page.locator('button').filter(
+                        has_text=re.compile(r'enviar', re.IGNORECASE)
+                    ).or_(
+                        page.locator('.swal-button--confirm, .confirm-button, button.swal-button')
+                    ).first
+                    if btn_envio.count():
+                        btn_envio.click(timeout=10000)
+                    else:
+                        # Fallback: buscar cualquier botón visible
+                        _btn_click(page, 'enviar')
+                navegacion_completa = True
+                logger.info('[7b] Navegación detectada y completada')
             except Exception as nav_err:
-                logger.warning('[7b] La navegación no se detectó por wait_for_load_state: %s', nav_err)
-                # Fallback: esperar un momento
-                page.wait_for_timeout(2000)
+                logger.warning('[7b] expect_navigation falló: %s', nav_err)
+                # Verificar si ya estamos en una URL diferente
+                url_actual = page.url
+                logger.info('[7b] URL actual después del intento: %s', url_actual)
+
+            if not navegacion_completa:
+                # Fallback: intentar de nuevo con timeout
+                try:
+                    page.wait_for_load_state('networkidle', timeout=10000)
+                    logger.info('[7b] load_state completado (fallback)')
+                except Exception:
+                    page.wait_for_timeout(3000)
 
             # Pequeña pausa para que el DOM termine de renderizar
             page.wait_for_timeout(1000)
