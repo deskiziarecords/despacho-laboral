@@ -131,16 +131,19 @@ def _click_radio(page, name, value):
     """Selecciona un radio button por name y value.
     Usa JS directamente porque Bootstrap custom radios tienen labels que
     interceptan los clicks nativos de Playwright."""
-    return page.evaluate("""(args) => {
-        const [name, value] = args;
-        const r = document.querySelector(`input[name="${name}"][value="${value}"]`);
-        if (r) {
-            r.click();
-            r.dispatchEvent(new Event('change', {bubbles: true}));
-            return true;
-        }
-        return false;
-    }""", [name, value])
+    try:
+        return page.evaluate("""(args) => {
+            const [name, value] = args;
+            const r = document.querySelector(`input[name="${name}"][value="${value}"]`);
+            if (r) {
+                r.click();
+                r.dispatchEvent(new Event('change', {bubbles: true}));
+                return true;
+            }
+            return false;
+        }""", [name, value])
+    except Exception:
+        return False
 
 
 def _navigate_wizard_tab(page, texto_contiene):
@@ -155,22 +158,28 @@ def _navigate_wizard_tab(page, texto_contiene):
             return True
     except Exception:
         pass
-    return page.evaluate(f"""(kw) => {{
-        for (const el of document.querySelectorAll('.wizard-step a, .nav-link, .step-title, a[class*="step"]')) {{
-            const txt = el.textContent.trim().toLowerCase();
-            if (txt.includes(kw.toLowerCase())) {{
-                el.click();
-                el.dispatchEvent(new Event('click', {{bubbles: true}}));
-                return true;
+    try:
+        return page.evaluate(f"""(kw) => {{
+            for (const el of document.querySelectorAll('.wizard-step a, .nav-link, .step-title, a[class*="step"]')) {{
+                const txt = el.textContent.trim().toLowerCase();
+                if (txt.includes(kw.toLowerCase())) {{
+                    el.click();
+                    el.dispatchEvent(new Event('click', {{bubbles: true}}));
+                    return true;
+                }}
             }}
-        }}
-        return false;
-    }}""", texto_contiene)
+            return false;
+        }}""", texto_contiene)
+    except Exception:
+        return False
 
 
 def _cerrar_modales(page):
     """Cierra cualquier modal/overlay que esté abierto."""
-    return page.evaluate("""() => {
+    # Esperar un momento antes de interactuar (evita "context destroyed")
+    try:
+        page.wait_for_timeout(300)
+        return page.evaluate("""() => {
         let count = 0;
         // Cerrar SweetAlert primero
         const swal = document.querySelector('.swal-overlay--show-modal, .swal-overlay');
@@ -211,6 +220,8 @@ def _cerrar_modales(page):
         document.body.style.paddingRight = '';
         return count;
     }""")
+    except Exception:
+        return 0
 
 
 def _click_validar_continuar(page):
@@ -225,17 +236,20 @@ def _click_validar_continuar(page):
     except Exception:
         pass
     # Fallback: buscar botón que contenga ambos textos
-    return page.evaluate("""() => {
-        for (const btn of document.querySelectorAll('button')) {
-            const t = btn.textContent.trim().toLowerCase();
-            if (t.includes('validar') && t.includes('continuar')) {
-                btn.click();
-                btn.dispatchEvent(new Event('click', {bubbles: true}));
-                return true;
+    try:
+        return page.evaluate("""() => {
+            for (const btn of document.querySelectorAll('button')) {
+                const t = btn.textContent.trim().toLowerCase();
+                if (t.includes('validar') && t.includes('continuar')) {
+                    btn.click();
+                    btn.dispatchEvent(new Event('click', {bubbles: true}));
+                    return true;
+                }
             }
-        }
-        return false;
-    }""")
+            return false;
+        }""")
+    except Exception:
+        return False
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -612,7 +626,8 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             page.wait_for_timeout(1000)
 
             # Verificar errores antes de enviar
-            errores = page.evaluate("""() => {
+            try:
+                errores = page.evaluate("""() => {
                 const errs = [];
                 document.querySelectorAll('.text-danger, .error, .invalid-feedback, .is-invalid, .help-block').forEach(el => {
                     const txt = el.textContent.trim();
@@ -623,6 +638,8 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                 });
                 return errs;
             }""")
+            except Exception:
+                errores = []
             if errores:
                 logger.warning('  Errores detectados antes de enviar: %s', errores)
                 for err in errores[:3]:
@@ -694,13 +711,16 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                 texto_final = checkpoint('08_final')
 
                 # Buscar enlace de descarga en la página
-                doc_url = page.evaluate("""() => {
-                    const links = document.querySelectorAll('a[href*="getFile"], a[href*="documento"], a[href*="folio"]');
-                    for (const link of links) {
-                        if (link.href) return link.href;
-                    }
-                    return '';
-                }""")
+                try:
+                    doc_url = page.evaluate("""() => {
+                        const links = document.querySelectorAll('a[href*="getFile"], a[href*="documento"], a[href*="folio"]');
+                        for (const link of links) {
+                            if (link.href) return link.href;
+                        }
+                        return '';
+                    }""")
+                except Exception:
+                    doc_url = ''
                 if doc_url:
                     resultado.detalle = f'Solicitud enviada. URL documento: {doc_url}'
                     folio_match = re.search(r'getFile/([\\w-]+)', doc_url)
