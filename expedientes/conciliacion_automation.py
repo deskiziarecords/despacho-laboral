@@ -151,7 +151,7 @@ def _navigate_wizard_tab(page, texto_contiene):
         ).first
         if locator.count():
             locator.click()
-            page.wait_for_timeout(1500)
+            page.wait_for_timeout(800)
             return True
     except Exception:
         pass
@@ -311,7 +311,7 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
     _fill_input(page, 'dato_laboral[fecha_salida]', fecha_sal_str)
     _select_option(page, 'dato_laboral[jornada_id]', jornada_id)
 
-    page.wait_for_timeout(1000)
+    page.wait_for_timeout(500)
 
     # Click "Guardar" para cerrar el panel del solicitante
     _btn_click(page, 'guardar', timeout=5000)
@@ -325,7 +325,7 @@ def _llenar_citado(page, cliente):
     # Tipo persona: desde el modelo (Física o Moral)
     tipo_persona_id = TIPO_PERSONA_PORTAL_IDS.get(cliente.tipo_persona_citado, '1')
     _click_radio(page, 'solicitado[tipo_persona_id]', tipo_persona_id)
-    page.wait_for_timeout(500)
+    page.wait_for_timeout(300)
 
     # Datos del citado
     _fill_input(page, 'solicitado[nombre]', nombre_parts[0] if nombre_parts else 'Empresa')
@@ -347,7 +347,7 @@ def _llenar_citado(page, cliente):
     # Teléfono de contacto
     _fill_input(page, 'contactos[1]', cliente.empresa_telefono or cliente.telefono or '6641234567')
 
-    page.wait_for_timeout(1000)
+    page.wait_for_timeout(500)
 
     # Click "Guardar" para cerrar el panel del citado
     _btn_click(page, 'guardar', timeout=5000)
@@ -400,9 +400,9 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             browser = p.chromium.launch(
                 headless=actual_headless,
-                slow_mo=300 if not actual_headless else 100,
+                slow_mo=300 if not actual_headless else 50,
                 args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
-                timeout=20000,
+                timeout=15000,
             )
             context = browser.new_context(
                 viewport={'width': 1280, 'height': 900},
@@ -444,10 +444,10 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             # ════════════════════════════════════════════════════════════════
             logger.info('[Carga] Navegando a %s', URL_SOLICITUD)
             try:
-                page.goto(URL_SOLICITUD, wait_until='networkidle', timeout=30000)
+                page.goto(URL_SOLICITUD, wait_until='networkidle', timeout=20000)
             except PwTimeout:
-                page.goto(URL_SOLICITUD, timeout=30000)
-            page.wait_for_timeout(3000)
+                page.goto(URL_SOLICITUD, timeout=20000)
+            page.wait_for_timeout(1000)
             checkpoint('00_inicio')
 
             # ════════════════════════════════════════════════════════════════
@@ -457,15 +457,15 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             # Seleccionar radio "Acepto" (radioAviso = '1')
             _click_radio(page, 'radioAviso', '1')
-            page.wait_for_timeout(500)
+            page.wait_for_timeout(200)
 
             # Click "Aceptar"
             _btn_click(page, 'Aceptar')
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(500)
 
             # Cerrar modales que aparezcan
             _cerrar_modales(page)
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(500)
             checkpoint('01_aviso_aceptado')
 
             # ════════════════════════════════════════════════════════════════
@@ -475,19 +475,19 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             # Seleccionar "Ninguna de las anteriores" (industria = 28)
             _click_radio(page, 'industria', '28')
-            page.wait_for_timeout(1500)
+            page.wait_for_timeout(500)
 
             # Cerrar modal informativo que pueda aparecer
             _cerrar_modales(page)
-            page.wait_for_timeout(500)
+            page.wait_for_timeout(200)
 
             # Click "Validar y Continuar"
             _click_validar_continuar(page)
-            page.wait_for_timeout(3000)
+            page.wait_for_timeout(1000)
 
             # Cerrar modales
             _cerrar_modales(page)
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(500)
             checkpoint('02_industria')
 
             # ════════════════════════════════════════════════════════════════
@@ -497,15 +497,13 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             # Llenar fecha de conflicto
             _fill_input(page, 'solicitud[fecha_conflicto]', fmt_fecha(fecha_conflicto))
-            page.wait_for_timeout(500)
-
             # Seleccionar objeto (despido = '1')
             _select_option(page, 'solicitud[objeto_id]', '1')
-            page.wait_for_timeout(500)
+            page.wait_for_timeout(300)
 
             # Click "Validar y Continuar"
             _click_validar_continuar(page)
-            page.wait_for_timeout(3000)
+            page.wait_for_timeout(1000)
             checkpoint('03_fecha_objeto')
 
             # ════════════════════════════════════════════════════════════════
@@ -515,23 +513,23 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             # Navegar al tab "Solicitante"
             _navigate_wizard_tab(page, 'solicitante')
-            page.wait_for_timeout(1500)
+            page.wait_for_timeout(800)
 
             # Click "Agregar solicitante"
             _btn_click(page, 'agregar solicitante')
-            page.wait_for_timeout(3000)
+            page.wait_for_timeout(1500)
 
             # Llenar campos del solicitante
             _llenar_solicitante(page, cliente,
                                 fmt_fecha(fecha_nac),
                                 fmt_fecha(fecha_ing),
                                 fmt_fecha(fecha_sal))
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(1000)
             checkpoint('04_solicitante')
 
             # Click "Validar y Continuar"
             _click_validar_continuar(page)
-            page.wait_for_timeout(3000)
+            page.wait_for_timeout(1000)
             checkpoint('04_solicitante_validado')
 
             # ════════════════════════════════════════════════════════════════
@@ -541,20 +539,20 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             # Navegar al tab "Citado"
             _navigate_wizard_tab(page, 'citado')
-            page.wait_for_timeout(1500)
+            page.wait_for_timeout(800)
 
             # Click "Agregar citado"
             _btn_click(page, 'agregar citado')
-            page.wait_for_timeout(3000)
+            page.wait_for_timeout(1500)
 
             # Llenar campos del citado
             _llenar_citado(page, cliente)
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(1000)
             checkpoint('05_citado')
 
             # Click "Validar y Continuar"
             _click_validar_continuar(page)
-            page.wait_for_timeout(3000)
+            page.wait_for_timeout(1000)
             checkpoint('05_citado_validado')
 
             # ════════════════════════════════════════════════════════════════
@@ -564,7 +562,7 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             # Navegar al tab "Descripción"
             _navigate_wizard_tab(page, 'descripci')
-            page.wait_for_timeout(1500)
+            page.wait_for_timeout(800)
 
             # Construir texto de descripción
             hechos = [
@@ -586,7 +584,6 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             # Cerrar cualquier modal/SweetAlert que esté bloqueando
             _cerrar_modales(page)
-            page.wait_for_timeout(500)
 
             # Llenar textarea con JS (evita interceptación de SweetAlert/modales)
             page.evaluate("""(texto) => {
@@ -598,11 +595,11 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                     ta.dispatchEvent(new Event('change', {bubbles: true}));
                 }
             }""", texto_hechos)
-            page.wait_for_timeout(500)
+            page.wait_for_timeout(300)
 
             # Click "Aceptar"
             _btn_click(page, 'aceptar')
-            page.wait_for_timeout(3000)
+            page.wait_for_timeout(1000)
             checkpoint('06_descripcion')
 
             # ════════════════════════════════════════════════════════════════
@@ -612,7 +609,7 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             # Navegar al tab "Resumen"
             _navigate_wizard_tab(page, 'resumen')
-            page.wait_for_timeout(2000)
+            page.wait_for_timeout(1000)
 
             # Verificar errores antes de enviar
             errores = page.evaluate("""() => {
@@ -628,23 +625,22 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             }""")
             if errores:
                 logger.warning('  Errores detectados antes de enviar: %s', errores)
-                # Si hay errores, intentar navegar de vuelta a corregir
                 for err in errores[:3]:
                     logger.warning('  Error: %s (campo: %s)', err['msg'], err['name'])
 
             # Click "Enviar solicitud"
             logger.info('[7a] Click en Enviar solicitud...')
             _btn_click(page, 'enviar solicitud')
-            page.wait_for_timeout(4000)
+            page.wait_for_timeout(2500)
 
             # Click "Enviar" (confirmación)
             logger.info('[7b] Confirmando envío...')
             _btn_click(page, 'enviar')
-            page.wait_for_timeout(5000)
+            page.wait_for_timeout(4000)
 
             # Cerrar modal de éxito
             _cerrar_modales(page)
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(500)
             checkpoint('07_enviado')
 
             # ════════════════════════════════════════════════════════════════
@@ -654,10 +650,10 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             # Click "Descargar acuse" o similar
             _btn_click(page, 'descargar')
-            page.wait_for_timeout(3000)
+            page.wait_for_timeout(1000)
 
             _btn_click(page, 'acuse')
-            page.wait_for_timeout(3000)
+            page.wait_for_timeout(1000)
 
             # Esperar a que termine la descarga
             page.wait_for_timeout(3000)
