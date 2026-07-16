@@ -760,78 +760,123 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             checkpoint('07_enviado')
 
             # ════════════════════════════════════════════════════════════════
-            #  FASE 8: Descargar acuse / PDF
+            #  FASE 8: Extraer folio + Descargar acuse PDF
             # ════════════════════════════════════════════════════════════════
-            logger.info('[8] Descargando acuse...')
+            logger.info('[8] Extrayendo folio y descargando acuse...')
 
-            # Click "Descargar acuse" o similar
-            _btn_click(page, 'descargar')
-            page.wait_for_timeout(1000)
+            # ── 8a: Extraer folio del texto de la página de confirmación ──
+            # La página en /solicitud/update muestra el folio prominentemente.
+            # Intentamos antes de cualquier click para no perder el contexto.
+            try:
+                texto_pagina = page.inner_text('body')
+                logger.info('[8] Texto de página de confirmación: %s...', texto_pagina[:400].replace('\n', ' | '))
 
-            _btn_click(page, 'acuse')
-            page.wait_for_timeout(1000)
+                FOLIO_PATTERNS = [
+                    # Etiqueta explícita seguida de folio
+                    r'[Ff]olio[:\s#Nº°\.]*([A-Z0-9][-A-Z0-9/]+)',
+                    r'N[úu]mero\s+de\s+[Ss]olicitud[:\s]*([A-Z0-9][-A-Z0-9/]+)',
+                    r'N[úu]mero\s+de\s+[Ff]olio[:\s]*([A-Z0-9][-A-Z0-9/]+)',
+                    r'[Ss]olicitud\s+N[°º]?[:\s]*([A-Z0-9][-A-Z0-9/]+)',
+                    r'Expediente[:\s#]*([A-Z0-9][-A-Z0-9/]+)',
+                    # Formatos típicos del portal BC
+                    r'(CCL[-/][A-Z0-9/-]+)',
+                    r'(BCN?[-/][A-Z0-9/-]+)',
+                    r'(CFFL[-/][A-Z0-9/-]+)',
+                    r'(BC[-/]CCFL[-/][A-Z0-9/-]+)',
+                    # Número de 4 dígitos (año) guion número
+                    r'\b(\d{4}[-/]\d{4,8})\b',
+                ]
+                for pat in FOLIO_PATTERNS:
+                    m = re.search(pat, texto_pagina)
+                    if m:
+                        folio_candidato = (m.group(1) if m.lastindex else m.group(0)).strip().rstrip('.')
+                        logger.info('[8] Folio encontrado en página con patrón "%s": %s', pat, folio_candidato)
+                        resultado.folio = folio_candidato
+                        resultado.success = True
+                        break
 
-            # Esperar a que termine la descarga
+                if not resultado.folio:
+                    logger.warning('[8] No se encontró folio en el texto de la página')
+                    logger.info('[8] Texto completo para diagnóstico: %s', texto_pagina[:1500])
+            except Exception as e:
+                logger.warning('[8] Error al extraer texto de página: %s', e)
+
+            # ── 8b: Intentar descargar el PDF del acuse ───────────────────
+            # Probamos múltiples textos de botón que el portal podría usar
+            for texto_btn in ['acuse', 'descargar', 'pdf', 'comprobante', 'recibo',
+                              'imprimir', 'constancia', 'solicitud', 'documento']:
+                _btn_click(page, texto_btn)
+                page.wait_for_timeout(600)
+
+            # Esperar a que la descarga termine
             try:
                 page.wait_for_load_state('networkidle', timeout=10000)
             except Exception:
                 pass
-            page.wait_for_timeout(1500)
+            page.wait_for_timeout(2000)
 
-            # ── Extraer folio del PDF descargado ──────────────────────
-            logger.info('[Folio] Buscando PDF descargado...')
+            checkpoint('08_confirmacion')
+
+            # ── 8c: Si se descargó un PDF, extraer folio de él también ───
             if pdf_descargado:
                 pdf_path = Path(pdf_descargado)
                 resultado.pdf_path = str(pdf_path)
                 nombre_pdf = pdf_path.stem
-                logger.info('  Nombre PDF: %s', nombre_pdf)
+                logger.info('[8] PDF descargado: %s', nombre_pdf)
 
-                folio_match = re.search(r'(CCL[/\\-][\\w/-]+|[\\d]{4,}-[\\d]+|[\\w-]+folio[\\w-]*)',
-                                        nombre_pdf, re.IGNORECASE)
-                if folio_match:
-                    resultado.folio = folio_match.group(1)
+                # Folio desde el nombre del archivo
+                if not resultado.folio:
+                    for pat in [r'(CCL[-/][\w/-]+)', r'(\d{4}[-/]\d{4,8})', r'([\w-]+folio[\w-]*)']:
+                        m = re.search(pat, nombre_pdf, re.IGNORECASE)
+                        if m:
+                            resultado.folio = m.group(1)
+                            break
 
-                # Si no está en el nombre, buscar en el contenido del PDF
+                # Folio desde el contenido del PDF
                 if not resultado.folio:
                     try:
                         with open(pdf_descargado, 'rb') as f:
                             contenido = f.read()
                         texto_pdf = contenido.decode('latin-1', errors='ignore')
-                        folio_match = re.search(
-                            r'(CCL[:\\s]*[/\\d\\-]+|FOLIO[:\\s]*[\\w/-]+)',
-                            texto_pdf, re.IGNORECASE
-                        )
-                        if folio_match:
-                            resultado.folio = folio_match.group(1).strip()
+                        for pat in [r'(CCL[:\s]*/[\d\-]+)', r'FOLIO[:\s]*([\w/-]+)',
+                                    r'N[úu]mero[:\s]*([\w/-]+)', r'(\d{4}[-/]\d{4,8})']:
+                            m = re.search(pat, texto_pdf, re.IGNORECASE)
+                            if m:
+                                resultado.folio = m.group(1).strip()
+                                break
                     except Exception as e:
-                        logger.warning('  No se pudo leer PDF: %s', e)
+                        logger.warning('[8] No se pudo leer PDF: %s', e)
 
                 resultado.success = True
                 resultado.detalle = f'Solicitud enviada. Folio: {resultado.folio or "N/A"}'
-                logger.info('  Éxito! Folio=%s PDF=%s', resultado.folio, pdf_descargado)
-            else:
-                logger.warning('  No se descargó ningún PDF')
-                texto_final = checkpoint('08_final')
+                logger.info('[8] Éxito con PDF. Folio=%s', resultado.folio)
 
-                # Buscar enlace de descarga en la página
+            elif resultado.success and resultado.folio:
+                # Folio encontrado en texto aunque sin PDF
+                resultado.detalle = f'Solicitud enviada. Folio: {resultado.folio} (sin PDF)'
+                logger.info('[8] Éxito sin PDF. Folio=%s', resultado.folio)
+
+            else:
+                # ── 8d: Buscar enlace de descarga como último recurso ─────
                 try:
                     doc_url = page.evaluate("""() => {
-                        const links = document.querySelectorAll('a[href*="getFile"], a[href*="documento"], a[href*="folio"]');
-                        for (const link of links) {
+                        const sel = 'a[href*="getFile"], a[href*="acuse"], a[href*="documento"], a[href*="folio"], a[href*=".pdf"]';
+                        for (const link of document.querySelectorAll(sel)) {
                             if (link.href) return link.href;
                         }
                         return '';
                     }""")
                 except Exception:
                     doc_url = ''
+
                 if doc_url:
                     resultado.detalle = f'Solicitud enviada. URL documento: {doc_url}'
-                    folio_match = re.search(r'getFile/([\\w-]+)', doc_url)
-                    if folio_match:
-                        resultado.folio = folio_match.group(1)
+                    m = re.search(r'getFile/([\w-]+)|folio=([\w-]+)', doc_url)
+                    if m:
+                        resultado.folio = (m.group(1) or m.group(2))
                         resultado.success = True
                 else:
-                    resultado.error = 'No se pudo descargar el acuse ni obtener folio'
+                    resultado.error = 'Solicitud enviada al portal pero no se pudo obtener el folio'
                     try:
                         resultado.detalle = f'URL final: {page.url}'
                     except Exception:
