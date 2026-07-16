@@ -283,6 +283,66 @@ TIPO_PERSONA_PORTAL_IDS = {
 }
 
 
+def _limpiar_telefono(telefono):
+    """Retorna sólo los últimos 10 dígitos (sin código de país)."""
+    import re as _re
+    digits = _re.sub(r'\D', '', telefono or '')
+    return digits[-10:] if len(digits) >= 10 else digits or '6641234567'
+
+
+def _llenar_domicilio(page, vialidad, num_ext, cp, prefix='domicilio'):
+    """Llena los campos de domicilio y espera al AJAX del CP para seleccionar municipio y colonia."""
+    _select_option(page, f'{prefix}[estado_id]', '02')         # Baja California
+    _select_option(page, f'{prefix}[tipo_vialidad_id]', '5')   # CALLE
+    _fill_input(page, f'{prefix}[vialidad]', vialidad or 'Av Principal')
+    _fill_input(page, f'{prefix}[num_ext]', num_ext or '123')
+
+    # Llenar CP y disparar eventos para que el portal cargue colonia/municipio vía AJAX
+    cp_val = cp or '22000'
+    try:
+        page.evaluate("""(args) => {
+            const [name, val] = args;
+            const el = document.querySelector(`[name="${name}"]`);
+            if (el) {
+                el.focus();
+                el.value = val;
+                ['input', 'change', 'blur'].forEach(ev =>
+                    el.dispatchEvent(new Event(ev, {bubbles: true})));
+            }
+        }""", [f'{prefix}[cp]', cp_val])
+    except Exception:
+        _fill_input(page, f'{prefix}[cp]', cp_val)
+
+    # Esperar a que el AJAX cargue las opciones de colonia y municipio
+    page.wait_for_timeout(3000)
+
+    # Seleccionar primer municipio disponible (el portal lo carga según CP)
+    try:
+        page.evaluate("""(name) => {
+            const sel = document.querySelector(`[name="${name}"]`);
+            if (sel && sel.options.length > 1 && !sel.value) {
+                sel.selectedIndex = 1;
+                sel.dispatchEvent(new Event('change', {bubbles: true}));
+            }
+        }""", 'municipio')
+    except Exception:
+        pass
+    page.wait_for_timeout(500)
+
+    # Seleccionar primer colonia/asentamiento disponible
+    try:
+        page.evaluate("""(name) => {
+            const sel = document.querySelector(`[name="${name}"]`);
+            if (sel && sel.options.length > 1) {
+                sel.selectedIndex = 1;
+                sel.dispatchEvent(new Event('change', {bubbles: true}));
+            }
+        }""", f'{prefix}[asentamiento]')
+    except Exception:
+        pass
+    page.wait_for_timeout(300)
+
+
 def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_str):
     """Llena los campos del solicitante (trabajador)."""
     nombre_parts = (cliente.nombre or '').split()
@@ -301,16 +361,13 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
     _select_option(page, 'solicitante[nacionalidad_id]', '1')   # MEXICANA (siempre)
 
     # Contactos (teléfono) — el sitio usa contactos[1], contactos[2], contactos[3]
-    _fill_input(page, 'contactos[1]', cliente.telefono or '6641234567')
+    _fill_input(page, 'contactos[1]', _limpiar_telefono(cliente.telefono))
 
-    # Domicilio
-    _select_option(page, 'domicilio[estado_id]', '02')              # Baja California
-    _select_option(page, 'domicilio[tipo_vialidad_id]', '5')        # CALLE
-    _fill_input(page, 'domicilio[vialidad]', cliente.direccion_calle or 'Av Principal')
-    _fill_input(page, 'domicilio[num_ext]', cliente.direccion_numero or '123')
-    _fill_input(page, 'domicilio[cp]', cliente.direccion_cp or '22000')
-    _select_option(page, 'domicilio[asentamiento]', cliente.direccion_colonia or 'Centro')
-    _select_option(page, 'municipio', 'Tijuana')
+    # Domicilio con espera de AJAX para colonia/municipio
+    _llenar_domicilio(page,
+                      vialidad=cliente.direccion_calle,
+                      num_ext=cliente.direccion_numero,
+                      cp=cliente.direccion_cp)
 
     # Datos laborales
     periodicidad_id = PERIODICIDAD_PORTAL_IDS.get(cliente.periodo_pago, '2')
@@ -349,17 +406,14 @@ def _llenar_citado(page, cliente):
     _select_option(page, 'solicitado[genero_id]', '1')             # MASCULINO
     _select_option(page, 'solicitado[nacionalidad_id]', '1')       # MEXICANA
 
-    # Domicilio del citado
-    _select_option(page, 'domicilio[estado_id]', '02')
-    _select_option(page, 'domicilio[tipo_vialidad_id]', '5')
-    _fill_input(page, 'domicilio[vialidad]', cliente.empresa_calle or cliente.direccion_calle or 'Av Principal')
-    _fill_input(page, 'domicilio[num_ext]', cliente.empresa_numero or cliente.direccion_numero or '123')
-    _fill_input(page, 'domicilio[cp]', cliente.empresa_cp or cliente.direccion_cp or '22000')
-    _select_option(page, 'domicilio[asentamiento]', cliente.empresa_colonia or cliente.direccion_colonia or 'Centro')
-    _select_option(page, 'municipio', 'Tijuana')
+    # Domicilio del citado con espera de AJAX para colonia/municipio
+    _llenar_domicilio(page,
+                      vialidad=cliente.empresa_calle or cliente.direccion_calle,
+                      num_ext=cliente.empresa_numero or cliente.direccion_numero,
+                      cp=cliente.empresa_cp or cliente.direccion_cp)
 
     # Teléfono de contacto
-    _fill_input(page, 'contactos[1]', cliente.empresa_telefono or cliente.telefono or '6641234567')
+    _fill_input(page, 'contactos[1]', _limpiar_telefono(cliente.empresa_telefono or cliente.telefono))
 
     page.wait_for_timeout(500)
 
