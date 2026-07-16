@@ -566,7 +566,12 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             # Click "Validar y Continuar"
             _click_validar_continuar(page)
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(1500)
+            # Wait for any portal-side navigation triggered by Validar y Continuar
+            try:
+                page.wait_for_load_state('domcontentloaded', timeout=5000)
+            except Exception:
+                pass
             checkpoint('05_citado_validado')
 
             # ════════════════════════════════════════════════════════════════
@@ -600,15 +605,18 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             _cerrar_modales(page)
 
             # Llenar textarea con JS (evita interceptación de SweetAlert/modales)
-            page.evaluate("""(texto) => {
-                const ta = document.querySelector('textarea');
-                if (ta) {
-                    ta.focus();
-                    ta.value = texto;
-                    ta.dispatchEvent(new Event('input', {bubbles: true}));
-                    ta.dispatchEvent(new Event('change', {bubbles: true}));
-                }
-            }""", texto_hechos)
+            try:
+                page.evaluate("""(texto) => {
+                    const ta = document.querySelector('textarea');
+                    if (ta) {
+                        ta.focus();
+                        ta.value = texto;
+                        ta.dispatchEvent(new Event('input', {bubbles: true}));
+                        ta.dispatchEvent(new Event('change', {bubbles: true}));
+                    }
+                }""", texto_hechos)
+            except Exception:
+                pass
             page.wait_for_timeout(300)
 
             # Click "Aceptar"
@@ -824,7 +832,10 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                         resultado.success = True
                 else:
                     resultado.error = 'No se pudo descargar el acuse ni obtener folio'
-                    resultado.detalle = f'URL final: {page.url}'
+                    try:
+                        resultado.detalle = f'URL final: {page.url}'
+                    except Exception:
+                        resultado.detalle = 'URL final: desconocida (contexto destruido)'
 
             browser.close()
 
