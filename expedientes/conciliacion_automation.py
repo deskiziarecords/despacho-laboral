@@ -767,9 +767,10 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             # ── 8a: Extraer folio del texto de la página de confirmación ──
             # La página en /solicitud/update muestra el folio prominentemente.
             # Intentamos antes de cualquier click para no perder el contexto.
+            texto_pagina = ''
             try:
                 texto_pagina = page.inner_text('body')
-                logger.info('[8] Texto de página de confirmación: %s...', texto_pagina[:400].replace('\n', ' | '))
+                logger.info('[8] Texto de página de confirmación: %s...', texto_pagina[:600].replace('\n', ' | '))
 
                 FOLIO_PATTERNS = [
                     # Etiqueta explícita seguida de folio
@@ -878,9 +879,11 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                 else:
                     resultado.error = 'Solicitud enviada al portal pero no se pudo obtener el folio'
                     try:
-                        resultado.detalle = f'URL final: {page.url}'
+                        url_final = page.url
                     except Exception:
-                        resultado.detalle = 'URL final: desconocida (contexto destruido)'
+                        url_final = 'desconocida'
+                    # Store page text so it's visible in the task detalle for debugging
+                    resultado.detalle = f'URL={url_final} | TEXTO={texto_pagina[:800]}'
 
             browser.close()
 
