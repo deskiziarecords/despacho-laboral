@@ -615,45 +615,60 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
     _fill_input(page, 'solicitante[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'Perez', 10))
     _fill_input(page, 'solicitante[segundo_apellido]', _truncar(nombre_parts[2] if len(nombre_parts) > 2 else 'Lopez', 10))
 
-    # CURP: estratégia - deshabilitar validación del portal ANTES de llenar,
-    # luego llenar con eventos para que el framework registre el valor,
-    # luego restaurar validación
+    # CURP: usar nativeSetter para evitar que la validación del portal borre
+    # el valor. El native setter (HTMLInputElement.prototype.value) actualiza
+    # el valor en el DOM y React/Vue lo detecta via dispatchEvent, pero
+    # NO dispara los handlers de validación personalizados del portal.
     try:
-        page.evaluate("""(curpVal) => {
+        val_after = page.evaluate("""(curpVal) => {
             const el = document.querySelector('[name="solicitante[curp]"]');
-            if (!el) return;
+            if (!el) return 'NOTFOUND';
+            const tag = el.tagName;
+            if (tag !== 'INPUT') return 'NOT_INPUT:' + tag;
             
-            // 1. Remove event listeners by replacing the element
-            const parent = el.parentNode;
-            const newEl = el.cloneNode(false);  // Clone without events
-            parent.replaceChild(newEl, el);
+            // 1. Remove readonly/disabled
+            if (el.readOnly) el.readOnly = false;
+            if (el.disabled) el.disabled = false;
             
-            // 2. Set value directly and dispatch events for framework
-            newEl.value = curpVal;
-            newEl.dispatchEvent(new Event('input', {bubbles: true}));
-            newEl.dispatchEvent(new Event('change', {bubbles: true}));
-            newEl.dispatchEvent(new Event('blur', {bubbles: true}));
+            // 2. Use native setter - bypasses portal's custom wrapper
+            //    but triggers React/Vue's change detection via event dispatch
+            const nativeSetter = Object.getOwnPropertyDescriptor(
+                HTMLInputElement.prototype, 'value'
+            );
+            if (nativeSetter && nativeSetter.set) {
+                nativeSetter.set.call(el, curpVal);
+            } else {
+                el.value = curpVal;
+            }
             
-            return newEl.value;
+            // 3. Focus and blur to trigger framework registration
+            el.dispatchEvent(new Event('focus', {bubbles: true}));
+            el.dispatchEvent(new Event('blur', {bubbles: true}));
+            
+            return el.value || '(empty)';
         }""", curp)
-        actual_val = page.evaluate("""() =>
-            document.querySelector('[name="solicitante[curp]"]')?.value || ''
-        """)
-        ok = (actual_val == curp)
-        detail = "clone_ok" if ok else f"clone_fail(={actual_val[:8]})"
+        ok = (val_after == curp)
+        detail = "nativesetter_ok" if ok else f"nativesetter_fail({val_after[:12]})"
         logger.info('[4curp] CURP=%s -> ok=%s detail=%s', curp[:12], ok, detail)
+        
+        if not ok:
+            # Fallback: Playwright native fill (con eventos completos)
+            try:
+                el = page.locator('[name="solicitante[curp]"]')
+                if el.count():
+                    el.fill(curp, timeout=3000)
+                    val2 = page.evaluate("""() =>
+                        document.querySelector('[name="solicitante[curp]"]')?.value || ''
+                    """)
+                    ok = (val2 == curp)
+                    detail = "pw_fill_ok" if ok else f"pw_fill_clr(={val2[:8]})"
+                    logger.info('[4curp] RETRY CURP=%s -> ok=%s detail=%s', curp[:12], ok, detail)
+            except Exception as e2:
+                logger.warning('[4curp] Fallback failed: %s', e2)
     except Exception as e:
-        logger.warning('[4curp] Clone approach failed: %s', e)
-        # Fallback: try Playwright native fill
-        try:
-            el = page.locator('[name="solicitante[curp]"]')
-            if el.count():
-                el.fill(curp, timeout=3000)
-                ok = True
-                detail = "pw_fallback"
-        except Exception:
-            ok = False
-            detail = str(e)
+        logger.warning('[4curp] Error: %s', e)
+        ok = False
+        detail = str(e)
     page.wait_for_timeout(300)
 
     _fill_input(page, 'solicitante[fecha_nacimiento]', fecha_nac_str)
