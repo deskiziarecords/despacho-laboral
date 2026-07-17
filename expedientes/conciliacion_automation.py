@@ -111,12 +111,9 @@ def _fill_input_silent(page, name, valor):
     """
     Establece el valor de un input SIN disparar eventos JS.
     
-    Esto es crítico para la CURP: el portal BC tiene validación
-    client-side que se activa con cada evento 'input'/'change' y
-    si detecta una CURP que no pasa el checksum, BORRA el valor.
-    
-    Al NO disparar eventos, el portal nunca se entera del cambio
-    hasta que se envía el formulario.
+    El portal BC tiene validación client-side que se activa con cada
+    evento 'input'/'change' y si la CURP no pasa el checksum, BORRA
+    el valor. Al NO disparar eventos, el portal nunca se entera.
     """
     if not valor:
         return False, "no value"
@@ -125,38 +122,18 @@ def _fill_input_silent(page, name, valor):
         result = page.evaluate("""(args) => {
             const [name, valor] = args;
             const el = document.querySelector(`[name="${name}"]`);
-            if (!el) return {ok: false, reason: 'not found', tag: null};
-            
-            const tag = el.tagName.toLowerCase();
-            
-            // Remove readonly/disabled if present
+            if (!el) return {ok: false, reason: 'not found'};
             if (el.readOnly) { el.readOnly = false; }
             if (el.disabled) { el.disabled = false; }
-            
-            // Set value WITHOUT dispatching ANY events
-            // The portal clears the field if we fire input/change events
-            // because its client-side CURP validation will reject our synthetic CURP
-            const previous = el.value;
             el.value = valor;
-            
-            const finalVal = el.value;
-            return {
-                ok: finalVal === valor,
-                reason: finalVal === valor ? 'ok' : `prev="${previous}" final="${finalVal}"`,
-                tag: tag,
-                final: finalVal,
-                maxlen: el.maxLength || -1
-            };
+            return {ok: el.value === valor, final: el.value, maxlen: el.maxLength || -1};
         }""", [name, valor_str])
-        
         if result and result.get('ok'):
             return True, f"ok(maxlen={result.get('maxlen','?')})"
-        
         reason = result.get('reason', 'unknown') if result else 'no result'
         logger.warning('  _fill_input_silent: %s[%s] => %s', name, valor_str[:10], reason)
         return False, reason
     except Exception as e:
-        logger.warning('  _fill_input_silent exception for %s: %s', name, e)
         return False, str(e)
 
 
@@ -598,12 +575,23 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
     _fill_input(page, 'solicitante[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'Perez', 10))
     _fill_input(page, 'solicitante[segundo_apellido]', _truncar(nombre_parts[2] if len(nombre_parts) > 2 else 'Lopez', 10))
 
-    # CURP: usar _fill_input_silent (SIN eventos) para evitar que la validación
-    # client-side del portal borre el valor inmediatamente después de escribirlo
-    ok, detail = _fill_input_silent(page, 'solicitante[curp]', curp)
+    # CURP: híbrido - primero Playwright nativo (con eventos, actualiza framework),
+    # si el portal limpia el valor, fallback a _fill_input_silent (sin eventos)
+    ok = False
+    detail = ""
+    try:
+        el = page.locator('[name="solicitante[curp]"]')
+        if el.count():
+            el.fill(curp, timeout=3000)
+            ok = True
+            detail = "pw_fill"
+    except Exception:
+        pass
+    if not ok:
+        ok, detail = _fill_input_silent(page, 'solicitante[curp]', curp)
     logger.info('[4curp] CURP=%s -> ok=%s detail=%s', curp[:12], ok, detail)
     if not ok:
-        page.wait_for_timeout(800)
+        page.wait_for_timeout(500)
         ok, detail = _fill_input_silent(page, 'solicitante[curp]', curp)
         logger.info('[4curp] RETRY CURP=%s -> ok=%s detail=%s', curp[:12], ok, detail)
     page.wait_for_timeout(300)
