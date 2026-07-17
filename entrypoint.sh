@@ -86,11 +86,12 @@ uv run python manage.py seed_datos 2>&1 || echo ">>> (Aviso: no se pudieron semb
 # Trap para shutdown graceful
 cleanup() {
     echo ">>> Deteniendo servicios..."
-    [ -n "$CELERY_PID" ] && kill "$CELERY_PID" 2>/dev/null && echo ">>> Celery Worker detenido"
-    [ -n "$GUNICORN_PID" ] && kill "$GUNICORN_PID" 2>/dev/null && echo ">>> Gunicorn detenido"
+    [ -n "$CELERY_PID" ] && kill "$CELERY_PID" 2>/dev/null
+    [ -n "$GUNICORN_PID" ] && kill "$GUNICORN_PID" 2>/dev/null
     exit 0
 }
-trap cleanup SIGTERM SIGINT
+# Signal names WITHOUT 'SIG' prefix (dash/POSIX compatible)
+trap cleanup TERM INT
 
 # Iniciar Celery Worker en background (si está habilitado)
 if [ "${CELERY_WORKER_ENABLED:-false}" = "true" ]; then
