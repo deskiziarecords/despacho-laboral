@@ -1098,9 +1098,16 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                 errores_validacion = _detectar_errores_validacion(page)
                 if errores_validacion:
                     msgs = '; '.join([f"{e['name']}: {e['msg']}" for e in errores_validacion[:5]])
+                    # Diagnostic: check CURP field value
+                    curp_diag = ''
+                    try:
+                        cv = page.evaluate("""() => document.querySelector('[name="solicitante[curp]\"]')?.value || 'NOTFOUND'""")
+                        curp_diag = f' | CURP_FIELD=[{cv[:12]}]'
+                    except Exception:
+                        pass
                     logger.warning('[7.5] Errores de validación detectados: %s', msgs)
-                    resultado.error = f'El portal rechazó la solicitud. Errores: {msgs}'
-                    resultado.detalle = f'URL={page.url} | ERRORES={msgs}'
+                    resultado.error = f'El portal rechazó la solicitud. Errores: {msgs}{curp_diag}'
+                    resultado.detalle = f'URL={page.url} | ERRORES={msgs}{curp_diag}'
                     browser.close()
                     return resultado  # Salir temprano
 
