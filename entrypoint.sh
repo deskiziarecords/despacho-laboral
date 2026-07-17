@@ -71,19 +71,49 @@ uv run python manage.py crear_usuarios_prueba 2>&1 || echo ">>> (Aviso: no se pu
 echo ">>> Sembrando datos de prueba..."
 uv run python manage.py seed_datos 2>&1 || echo ">>> (Aviso: no se pudieron sembrar datos de prueba — consulta los logs para más detalles)"
 
-# 7. Iniciar servicio según SERVICE_TYPE
-# SERVICE_TYPE=worker → Celery Worker
-# SERVICE_TYPE=web o por defecto → Gunicorn
-if [ "${SERVICE_TYPE:-web}" = "worker" ]; then
-    echo ">>> Iniciando Celery Worker..."
-    exec uv run celery -A config worker --loglevel=info --concurrency=1
-elif [ "${SERVICE_TYPE:-web}" = "beat" ]; then
-    echo ">>> Iniciando Celery Beat..."
-    exec uv run celery -A config beat --loglevel=info
+# ══════════════════════════════════════════════════════════════════════
+#  7. Iniciar SERVICIOS (Gunicorn + Celery Worker en el mismo contenedor)
+# ══════════════════════════════════════════════════════════════════════
+#
+# ESTRATEGIA:
+#   - Gunicorn corre en foreground (es el proceso principal).
+#   - Celery Worker corre en background si CELERY_WORKER_ENABLED=true.
+#   - Railway usa el health check HTTP contra Gunicorn (puerto 8000).
+#   - Al recibir SIGTERM, se detienen ambos procesos limpiamente.
+#
+# ══════════════════════════════════════════════════════════════════════
+
+# Trap para shutdown graceful
+cleanup() {
+    echo ">>> Deteniendo servicios..."
+    [ -n "$CELERY_PID" ] && kill "$CELERY_PID" 2>/dev/null && echo ">>> Celery Worker detenido"
+    [ -n "$GUNICORN_PID" ] && kill "$GUNICORN_PID" 2>/dev/null && echo ">>> Gunicorn detenido"
+    exit 0
+}
+trap cleanup SIGTERM SIGINT
+
+# Iniciar Celery Worker en background (si está habilitado)
+if [ "${CELERY_WORKER_ENABLED:-false}" = "true" ]; then
+    echo ">>> [worker] Iniciando Celery Worker..."
+    uv run celery -A config worker --loglevel=info --concurrency=1 &
+    CELERY_PID=$!
+    echo ">>> [worker] Celery Worker PID: $CELERY_PID"
 else
-    echo ">>> Iniciando Gunicorn en 0.0.0.0:${PORT:-8000}..."
-    exec uv run gunicorn config.wsgi:application \
-        --bind "0.0.0.0:${PORT:-8000}" \
-        --workers 3 \
-        --timeout 300
+    echo ">>> [worker] Celery Worker deshabilitado (CELERY_WORKER_ENABLED != true)"
 fi
+
+# Iniciar Gunicorn (foreground — proceso principal)
+echo ">>> [web] Iniciando Gunicorn en 0.0.0.0:${PORT:-8000}..."
+uv run gunicorn config.wsgi:application \
+    --bind "0.0.0.0:${PORT:-8000}" \
+    --workers 3 \
+    --timeout 300 &
+GUNICORN_PID=$!
+echo ">>> [web] Gunicorn PID: $GUNICORN_PID"
+
+# Esperar a que Gunicorn termine (proceso principal)
+# Si Gunicorn muere, detener Celery Worker y salir
+wait $GUNICORN_PID
+echo ">>> Gunicorn terminó. Deteniendo servicios secundarios..."
+[ -n "$CELERY_PID" ] && kill "$CELERY_PID" 2>/dev/null && wait "$CELERY_PID" 2>/dev/null
+echo ">>> Todos los servicios detenidos."
