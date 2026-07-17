@@ -259,8 +259,6 @@ def _extraer_folio_desde_pdf(pdf_path, nombre_pdf=''):
     Extrae el folio del nombre del archivo PDF o de su contenido.
     Retorna el folio como string, o cadena vacía si no encuentra.
     """
-    import re as _re
-
     # 1. Intentar desde el nombre del archivo
     for pat in [
         r'(CCL[-/][\w/-]+)',
@@ -269,7 +267,7 @@ def _extraer_folio_desde_pdf(pdf_path, nombre_pdf=''):
         r'([\w-]+folio[\w-]*)',
         r'(solicitud[\w-]*)',
     ]:
-        m = _re.search(pat, nombre_pdf, _re.IGNORECASE)
+        m = re.search(pat, nombre_pdf, re.IGNORECASE)
         if m:
             return m.group(1).strip()
 
@@ -290,7 +288,7 @@ def _extraer_folio_desde_pdf(pdf_path, nombre_pdf=''):
             r'(BC[\s-]CCFL[\s-][\d\-]+)',
             r'Expediente[:\s#]*([A-Z0-9][-A-Z0-9/]+)',
         ]:
-            m = _re.search(pat, texto_pdf, _re.IGNORECASE)
+            m = re.search(pat, texto_pdf, re.IGNORECASE)
             if m:
                 return m.group(1).strip()
     except Exception:
