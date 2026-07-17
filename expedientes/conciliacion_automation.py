@@ -386,7 +386,8 @@ def _calcular_digito_verificador(curp17):
     }
     suma = 0
     for i, c in enumerate(curp17.upper()):
-        digito = (mapa.get(c, 0) % 10)
+        val = mapa.get(c, 0)
+        digito = val % 10
         peso = 17 - i  # posición 1 → peso 17, posición 17 → peso 1
         suma += digito * peso
     residuo = suma % 10
