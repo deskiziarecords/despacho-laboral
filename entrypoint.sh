@@ -45,7 +45,7 @@ except User.DoesNotExist:
 # de PostgreSQL pueden quedar desincronizados. Esto previene errores
 # de "duplicate key value violates unique constraint" al crear registros.
 echo ">>> Resincronizando sequences..."
-uv run python -c "
+uv run python manage.py shell -c "
 from django.apps import apps
 from django.core.management import call_command
 from io import StringIO
