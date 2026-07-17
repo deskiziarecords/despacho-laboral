@@ -529,9 +529,9 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
     """Llena los campos del solicitante (trabajador)."""
     nombre_parts = (cliente.nombre or '').split()
 
-    # CURP: usar la real del cliente, o generar una sintética válida
-    curp = cliente.curp
-    if not curp:
+    # CURP: usar la real del cliente, ignorar 'XAXX010101000' (placeholder inválido)
+    curp = cliente.curp or ''
+    if not curp or curp.strip().upper() in ('XAXX010101000', 'XEXX010101000', 'N/A', ''):
         curp = _generar_curp(
             nombre=cliente.nombre,
             apellido1=nombre_parts[1] if len(nombre_parts) > 1 else 'Perez',
@@ -540,11 +540,11 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
             genero=cliente.genero,
         )
 
-    # Datos personales (truncados a 50 chars cada uno para evitar errores del portal)
+    # Datos personales (truncados a 25-30 chars para evitar errores del portal)
     _fill_input(page, 'solicitante[curp]', curp)
-    _fill_input(page, 'solicitante[nombre]', _truncar(nombre_parts[0] if nombre_parts else 'Juan', 50))
-    _fill_input(page, 'solicitante[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'Perez', 50))
-    _fill_input(page, 'solicitante[segundo_apellido]', _truncar(nombre_parts[2] if len(nombre_parts) > 2 else 'Lopez', 50))
+    _fill_input(page, 'solicitante[nombre]', _truncar(nombre_parts[0] if nombre_parts else 'Juan', 30))
+    _fill_input(page, 'solicitante[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'Perez', 25))
+    _fill_input(page, 'solicitante[segundo_apellido]', _truncar(nombre_parts[2] if len(nombre_parts) > 2 else 'Lopez', 25))
     _fill_input(page, 'solicitante[fecha_nacimiento]', fecha_nac_str)
 
     # Género y nacionalidad
@@ -590,11 +590,11 @@ def _llenar_citado(page, cliente):
     _click_radio(page, 'solicitado[tipo_persona_id]', tipo_persona_id)
     page.wait_for_timeout(300)
 
-    # Datos del citado (truncados a 50 chars para evitar errores del portal)
-    _fill_input(page, 'solicitado[nombre]', _truncar(nombre_parts[0] if nombre_parts else 'Empresa', 50))
-    _fill_input(page, 'solicitado[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'SA', 50))
+    # Datos del citado (truncados a 25-30 chars para evitar errores del portal)
+    _fill_input(page, 'solicitado[nombre]', _truncar(nombre_parts[0] if nombre_parts else 'Empresa', 30))
+    _fill_input(page, 'solicitado[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'SA', 25))
     _fill_input(page, 'solicitado[segundo_apellido]',
-                _truncar('de CV' if len(nombre_parts) <= 2 else ' '.join(nombre_parts[2:]), 50))
+                _truncar('de CV' if len(nombre_parts) <= 2 else ' '.join(nombre_parts[2:]), 25))
     _select_option(page, 'solicitado[genero_id]', '1')             # MASCULINO
     _select_option(page, 'solicitado[nacionalidad_id]', '1')       # MEXICANA
 
