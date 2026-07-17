@@ -325,7 +325,7 @@ document.addEventListener('DOMContentLoaded', function() {
             nombre1 = partes.length > 3 ? limpiarNombre(partes[3]) : nombre1;
         }
 
-        if (!apellido2) apellido2 = apellido1;
+        if (!apellido2) apellido2 = 'X';
 
         const letra1 = getPrimeraLetra(apellido1);
         const letra2 = getPrimeraVocalInterna(apellido1);
