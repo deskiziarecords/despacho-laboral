@@ -943,7 +943,32 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                                 fmt_fecha(fecha_ing),
                                 fmt_fecha(fecha_sal))
             page.wait_for_timeout(1000)
+
+            # Diagnostic: read solicitante field values from the DOM
+            try:
+                diag = page.evaluate("""() => {
+                    const names = ['solicitante[nombre]', 'solicitante[primer_apellido]',
+                                   'solicitante[segundo_apellido]', 'solicitante[curp]',
+                                   'solicitante[fecha_nacimiento]'];
+                    const result = {};
+                    for (const n of names) {
+                        const el = document.querySelector(`[name="${n}"]`);
+                        result[n] = el ? (el.value || '(empty)') : '(NOTFOUND)';
+                    }
+                    return result;
+                }""")
+                logger.info('[4diag] Solicitante field values: %s', diag)
+            except Exception as e:
+                logger.warning('[4diag] Error reading fields: %s', e)
+
             checkpoint('04_solicitante')
+
+            # Try also reading fields with Playwright native locator for confirmation
+            try:
+                pw_val = page.locator('[name="solicitante[nombre]\\"]').input_value(timeout=2000)
+                logger.info('[4diag2] Playwright native read: nombre=%s', pw_val)
+            except Exception as e:
+                logger.info('[4diag2] Playwright native read failed: %s', e)
 
             _click_validar_continuar(page)
             page.wait_for_timeout(1000)
