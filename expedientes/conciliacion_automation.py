@@ -1138,7 +1138,7 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                     except Exception:
                         pass
                     logger.warning('[7.5] Errores de validación detectados: %s', msgs)
-                    resultado.error = f'El portal rechazó la solicitud. Errores: {msgs}{curp_diag}'
+                    resultado.error = f'[DEPLOYED-ver3] El portal rechazó la solicitud. Errores: {msgs}{curp_diag}'
                     resultado.detalle = f'URL={page.url} | ERRORES={msgs}{curp_diag}'
                     browser.close()
                     return resultado  # Salir temprano
