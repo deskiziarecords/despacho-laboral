@@ -175,47 +175,49 @@ def _navigate_wizard_tab(page, texto_contiene):
 
 
 def _cerrar_modales(page):
-    """Cierra cualquier modal/overlay que esté abierto."""
-    # Esperar un momento antes de interactuar (evita "context destroyed")
+    """Cierra cualquier modal/overlay que esté abierto.
+
+    IMPORTANTE: Solo busca botones DENTRO de contenedores modales (SweetAlert,
+    Bootstrap modal, etc.) para evitar clickear botones del formulario principal
+    como "Validar y Continuar" o "Aceptar".
+    """
     try:
         page.wait_for_timeout(300)
         return page.evaluate("""() => {
         let count = 0;
-        // Cerrar SweetAlert primero
-        const swal = document.querySelector('.swal-overlay--show-modal, .swal-overlay');
-        if (swal) {
-            // Click en botón OK del SweetAlert
-            const okBtn = swal.querySelector('.swal-button--confirm, .swal-button, button');
+
+        // ── SweetAlert ────────────────────────────────────────────────────
+        const swalOverlay = document.querySelector('.swal-overlay--show-modal, .swal-overlay');
+        if (swalOverlay && swalOverlay.offsetParent !== null) {
+            // Intentar botón de confirmación primero, luego cualquier botón
+            const okBtn = swalOverlay.querySelector(
+                '.swal-button--confirm, .swal-button:not(.swal-button--cancel)'
+            ) || swalOverlay.querySelector('.swal-button, button');
             if (okBtn) { okBtn.click(); count++; }
-            swal.style.display = 'none';
-            swal.classList.remove('swal-overlay--show-modal');
-            count++;
         }
         document.querySelectorAll('.swal-overlay, .swal-modal').forEach(el => {
-            el.style.display = 'none';
-            count++;
+            el.style.display = 'none'; count++;
         });
-        // Clic en botones "Entendido", "Cerrar", etc.
-        for (const btn of document.querySelectorAll('button, a')) {
-            const txt = btn.textContent.trim().toLowerCase();
-            if (['entendido', 'cerrar', 'close', 'aceptar', 'ok', 'continuar', 'si, enviar'].some(k => txt.includes(k))) {
-                if (btn.offsetParent !== null) {
-                    btn.click();
-                    count++;
-                    break;
+
+        // ── Bootstrap modales ─────────────────────────────────────────────
+        // Solo buscar botones DENTRO de los contenedores de modal
+        const modalContainers = document.querySelectorAll(
+            '.modal.show, .modal.fade.show, [role="dialog"], .alert-dismissible'
+        );
+        for (const container of modalContainers) {
+            for (const btn of container.querySelectorAll('button, a')) {
+                const txt = btn.textContent.trim().toLowerCase();
+                // Coincidencia EXACTA para evitar clickear "Validar y Continuar"
+                if (['entendido', 'cerrar', 'close', 'aceptar', 'ok', 'si, enviar',
+                     'sí, enviar', 'confirmar', 'dismiss'].includes(txt)) {
+                    if (btn.offsetParent !== null) { btn.click(); count++; break; }
                 }
             }
+            container.classList.remove('show');
+            container.style.display = 'none';
+            count++;
         }
-        // Cerrar modales de Bootstrap
-        document.querySelectorAll('.modal.show, .modal.fade.show').forEach(m => {
-            m.classList.remove('show');
-            m.style.display = 'none';
-            count++;
-        });
-        document.querySelectorAll('.modal-backdrop').forEach(b => {
-            b.remove();
-            count++;
-        });
+        document.querySelectorAll('.modal-backdrop').forEach(b => { b.remove(); count++; });
         document.body.classList.remove('modal-open');
         document.body.style.paddingRight = '';
         return count;
@@ -563,10 +565,53 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             # ════════════════════════════════════════════════════════════════
             logger.info('[3] Llenando fecha y objeto...')
 
-            # Llenar fecha de conflicto
+            # Llenar fecha de conflicto y cerrar el date-picker que se abre
             _fill_input(page, 'solicitud[fecha_conflicto]', fmt_fecha(fecha_conflicto))
-            # Seleccionar objeto (despido = '1')
-            _select_option(page, 'solicitud[objeto_id]', '1')
+            # Escape cierra el calendario sin borrar el valor ya seteado
+            try:
+                page.keyboard.press('Escape')
+            except Exception:
+                pass
+            page.wait_for_timeout(400)
+
+            # Diagnóstico: listar todos los selects en la página para confirmar nombres
+            try:
+                selects_info = page.evaluate("""() =>
+                    Array.from(document.querySelectorAll('select')).map(s => ({
+                        name: s.name, id: s.id,
+                        opts: s.options.length,
+                        val: s.value
+                    }))
+                """)
+                logger.info('[3] Selects en página: %s', selects_info)
+            except Exception:
+                pass
+
+            # Seleccionar objeto — usar selectedIndex=1 porque el valor numérico
+            # varía por portal y setting el.value a un ID incorrecto falla silenciosamente
+            try:
+                objeto_texto = page.evaluate("""() => {
+                    // Intentar el nombre conocido primero, luego buscar por heurística
+                    let sel = document.querySelector('[name="solicitud[objeto_id]"]');
+                    if (!sel) {
+                        // Buscar el segundo select de la página (el primero podría ser otro)
+                        const allSels = document.querySelectorAll('select');
+                        for (const s of allSels) {
+                            if (s.name && s.name.toLowerCase().includes('objeto')) {
+                                sel = s; break;
+                            }
+                        }
+                    }
+                    if (sel && sel.options.length > 1) {
+                        sel.selectedIndex = 1;
+                        sel.dispatchEvent(new Event('change', {bubbles: true}));
+                        return sel.options[1].text + ' [name=' + sel.name + ']';
+                    }
+                    return null;
+                }""")
+                logger.info('[3] Objeto seleccionado: %s', objeto_texto)
+            except Exception as e:
+                logger.warning('[3] Error al seleccionar objeto: %s', e)
             page.wait_for_timeout(300)
 
             # Click "Validar y Continuar"
@@ -756,20 +801,27 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             try:
                 with page.expect_navigation(timeout=45000):
-                    # 7b: Click "Enviar" (SweetAlert confirmación, si existe)
-                    # Solo Playwright nativo - NUNCA evaluate aquí
-                    # click(timeout=5000) espera hasta 5s a que aparezca el botón
-                    logger.info('[7b] Click en confirmar (nativo, timeout 5s)...')
-                    btn_envio = page.locator('button').filter(
-                        has_text=re.compile(r'enviar', re.IGNORECASE)
-                    ).or_(
-                        page.locator('.swal-button--confirm, .confirm-button, button.swal-button')
-                    ).first
-                    try:
-                        btn_envio.click(timeout=5000)
-                        logger.info('[7b] Confirmación enviada')
-                    except Exception:
-                        logger.info('[7b] Sin confirmación - navegación directa o sin SweetAlert')
+                    # 7b: Click botón de confirmación del SweetAlert (si apareció)
+                    # Usar selector específico de SweetAlert para evitar clickear
+                    # "Enviar solicitud" del fondo de la página por error
+                    logger.info('[7b] Click en confirmar SweetAlert...')
+                    confirmed = False
+                    for sel in [
+                        '.swal-button--confirm',
+                        '.swal-button:not(.swal-button--cancel)',
+                        'button.swal-button',
+                    ]:
+                        try:
+                            btn = page.locator(sel).first
+                            if btn.count() > 0:
+                                btn.click(timeout=3000)
+                                logger.info('[7b] Confirmado con selector: %s', sel)
+                                confirmed = True
+                                break
+                        except Exception:
+                            continue
+                    if not confirmed:
+                        logger.info('[7b] Sin SweetAlert visible - navegación directa')
 
                 navegacion_completa = True
                 logger.info('[7] Navegación detectada! URL: %s → %s', url_inicial, page.url)
@@ -859,7 +911,7 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             # ── 8b: Intentar descargar el PDF del acuse ───────────────────
             # Probamos múltiples textos de botón que el portal podría usar
             for texto_btn in ['acuse', 'descargar', 'pdf', 'comprobante', 'recibo',
-                              'imprimir', 'constancia', 'solicitud', 'documento']:
+                              'imprimir', 'constancia', 'documento']:
                 _btn_click(page, texto_btn)
                 page.wait_for_timeout(600)
 
