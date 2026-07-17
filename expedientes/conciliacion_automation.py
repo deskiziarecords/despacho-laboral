@@ -107,6 +107,68 @@ def _fill_input(page, name, valor):
     return False
 
 
+def _fill_input_robust(page, name, valor):
+    """
+    Versión robusta de _fill_input que:
+    1. Quita readonly/disabled si existen
+    2. Establece el valor con múltiples eventos
+    3. Verifica que el valor se haya establecido
+    4. Reintenta con Playwright native si falla JS
+    """
+    if not valor:
+        return False, "no value"
+    valor_str = str(valor)
+    try:
+        result = page.evaluate("""(args) => {
+            const [name, valor] = args;
+            const el = document.querySelector(`[name="${name}"]`);
+            if (!el) return {ok: false, reason: 'not found', tag: null};
+            
+            const tag = el.tagName.toLowerCase();
+            
+            // Remove readonly/disabled if present
+            if (el.readOnly) el.readOnly = false;
+            if (el.disabled) el.disabled = false;
+            
+            // Focus + direct value
+            el.focus();
+            el.value = valor;
+            
+            // Multiple events to trigger any JS listener
+            ['input', 'change', 'blur', 'keyup', 'keydown', 'focusout', 'propertychange'].forEach(ev => {
+                el.dispatchEvent(new Event(ev, {bubbles: true, cancelable: true}));
+            });
+            
+            // Also try creating an InputEvent for reactive frameworks
+            try {
+                el.dispatchEvent(new InputEvent('input', {bubbles: true, cancelable: true, data: valor}));
+            } catch(e) {}
+            
+            const finalVal = el.value;
+            return {ok: finalVal === valor, reason: finalVal === valor ? 'ok' : `value="${finalVal}"`, tag: tag, final: finalVal};
+        }""", [name, valor_str])
+        
+        if result and result.get('ok'):
+            return True, "ok"
+        
+        reason = result.get('reason', 'unknown') if result else 'no result'
+        logger.warning('  _fill_input_robust: %s[%s] => %s', name, valor_str[:10], reason)
+        
+        # Fallback: try Playwright native fill
+        try:
+            el = page.locator(f'[name="{name}"]')
+            if el.count():
+                el.fill(valor_str, timeout=3000)
+                return True, "pw_fallback"
+        except Exception:
+            pass
+        
+        return False, reason
+    except Exception as e:
+        logger.warning('  _fill_input_robust exception for %s: %s', name, e)
+        return False, str(e)
+
+
 def _select_option(page, name, valor):
     """Selecciona una opción en un select usando JS directamente."""
     if not valor:
@@ -529,7 +591,7 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
     """Llena los campos del solicitante (trabajador)."""
     nombre_parts = (cliente.nombre or '').split()
 
-    # CURP: usar la real del cliente, ignorar 'XAXX010101000' (placeholder inválido)
+    # CURP: usar la real del cliente, ignorar placeholders inválidos
     curp = cliente.curp or ''
     if not curp or curp.strip().upper() in ('XAXX010101000', 'XEXX010101000', 'N/A', ''):
         curp = _generar_curp(
@@ -540,11 +602,16 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
             genero=cliente.genero,
         )
 
-    # Datos personales (truncados a 25-30 chars para evitar errores del portal)
-    _fill_input(page, 'solicitante[curp]', curp)
-    _fill_input(page, 'solicitante[nombre]', _truncar(nombre_parts[0] if nombre_parts else 'Juan', 30))
-    _fill_input(page, 'solicitante[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'Perez', 25))
-    _fill_input(page, 'solicitante[segundo_apellido]', _truncar(nombre_parts[2] if len(nombre_parts) > 2 else 'Lopez', 25))
+    # Datos personales (truncados agresivamente para respetar límites del portal)
+    _fill_input(page, 'solicitante[nombre]', _truncar(nombre_parts[0] if nombre_parts else 'Juan', 20))
+    _fill_input(page, 'solicitante[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'Perez', 15))
+    _fill_input(page, 'solicitante[segundo_apellido]', _truncar(nombre_parts[2] if len(nombre_parts) > 2 else 'Lopez', 15))
+
+    # CURP: usar _fill_input_robust con verificación y reintento
+    ok, detail = _fill_input_robust(page, 'solicitante[curp]', curp)
+    logger.info('[4curp] CURP=%s -> ok=%s detail=%s', curp[:12], ok, detail)
+    page.wait_for_timeout(300)
+
     _fill_input(page, 'solicitante[fecha_nacimiento]', fecha_nac_str)
 
     # Género y nacionalidad
@@ -590,11 +657,11 @@ def _llenar_citado(page, cliente):
     _click_radio(page, 'solicitado[tipo_persona_id]', tipo_persona_id)
     page.wait_for_timeout(300)
 
-    # Datos del citado (truncados a 25-30 chars para evitar errores del portal)
-    _fill_input(page, 'solicitado[nombre]', _truncar(nombre_parts[0] if nombre_parts else 'Empresa', 30))
-    _fill_input(page, 'solicitado[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'SA', 25))
+    # Datos del citado (truncados para respetar límites del portal)
+    _fill_input(page, 'solicitado[nombre]', _truncar(nombre_parts[0] if nombre_parts else 'Empresa', 20))
+    _fill_input(page, 'solicitado[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'SA', 15))
     _fill_input(page, 'solicitado[segundo_apellido]',
-                _truncar('de CV' if len(nombre_parts) <= 2 else ' '.join(nombre_parts[2:]), 25))
+                _truncar('de CV' if len(nombre_parts) <= 2 else ' '.join(nombre_parts[2:]), 15))
     _select_option(page, 'solicitado[genero_id]', '1')             # MASCULINO
     _select_option(page, 'solicitado[nacionalidad_id]', '1')       # MEXICANA
 
