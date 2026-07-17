@@ -35,9 +35,39 @@
                 <dd class="font-medium text-green-800">${{ resultado.desglose.prima_antiguedad|floatformat:2|intcomma }}</dd>
             </div>
             <div class="flex justify-between">
-                <dt class="text-green-700">⚖️ Indemnización:</dt>
+                <dt class="text-green-700">⚖️ Indemnización (90 días):</dt>
                 <dd class="font-medium text-green-800">${{ resultado.desglose.indemnizacion|floatformat:2|intcomma }}</dd>
             </div>
+            {% if resultado.desglose.indemnizacion_20dias > 0 %}
+            <div class="flex justify-between">
+                <dt class="text-green-700">📆 Indemnización 20 días/año:</dt>
+                <dd class="font-medium text-green-800">${{ resultado.desglose.indemnizacion_20dias|floatformat:2|intcomma }}</dd>
+            </div>
+            {% endif %}
+            {% if resultado.desglose.vacaciones_vencidas > 0 %}
+            <div class="flex justify-between">
+                <dt class="text-green-700">🗓️ Vacaciones vencidas:</dt>
+                <dd class="font-medium text-green-800">${{ resultado.desglose.vacaciones_vencidas|floatformat:2|intcomma }}</dd>
+            </div>
+            {% endif %}
+            {% if resultado.desglose.horas_extras > 0 %}
+            <div class="flex justify-between">
+                <dt class="text-green-700">⏰ Horas extras:</dt>
+                <dd class="font-medium text-green-800">${{ resultado.desglose.horas_extras|floatformat:2|intcomma }}</dd>
+            </div>
+            {% endif %}
+            {% if resultado.desglose.salarios_devengados > 0 %}
+            <div class="flex justify-between">
+                <dt class="text-green-700">💰 Salarios devengados:</dt>
+                <dd class="font-medium text-green-800">${{ resultado.desglose.salarios_devengados|floatformat:2|intcomma }}</dd>
+            </div>
+            {% endif %}
+            {% if resultado.desglose.dias_festivos > 0 %}
+            <div class="flex justify-between">
+                <dt class="text-green-700">🎉 Días festivos:</dt>
+                <dd class="font-medium text-green-800">${{ resultado.desglose.dias_festivos|floatformat:2|intcomma }}</dd>
+            </div>
+            {% endif %}
             <hr class="border-green-300 my-1.5">
             <div class="flex justify-between text-base">
                 <dt class="font-bold text-green-900">TOTAL:</dt>

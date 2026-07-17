@@ -200,10 +200,25 @@ class NotaForm(forms.ModelForm):
 
 
 class CalculoLaboralForm(forms.ModelForm):
-    """Formulario para editar parámetros del cálculo laboral."""
+    """Formulario para editar parámetros del cálculo laboral.
+    
+    Incluye checkboxes para seleccionar conceptos y campos de entrada
+    para conceptos semi-automáticos y manuales.
+    """
     class Meta:
         model = CalculoLaboral
-        fields = ['periodo_pago', 'notas']
+        fields = [
+            'periodo_pago', 'notas',
+            # Checkboxes de selección de conceptos
+            'incluir_aguinaldo', 'incluir_vacaciones', 'incluir_prima_vacacional',
+            'incluir_prima_antiguedad', 'incluir_indemnizacion',
+            'incluir_indemnizacion_20dias',
+            'incluir_vacaciones_vencidas', 'incluir_horas_extras',
+            'incluir_salarios_devengados', 'incluir_dias_festivos',
+            # Campos de entrada para conceptos
+            'dias_vacaciones_vencidos', 'horas_extra_cantidad',
+            'salarios_devengados', 'dias_festivos_cantidad',
+        ]
         widgets = {
             'periodo_pago': forms.Select(attrs={
                 'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
@@ -213,7 +228,48 @@ class CalculoLaboralForm(forms.ModelForm):
                 'rows': 3,
                 'placeholder': 'Anotaciones sobre este cálculo...',
             }),
+            # Checkboxes
+            'incluir_aguinaldo': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 concepto-checkbox', 'data-concepto': 'aguinaldo'}),
+            'incluir_vacaciones': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 concepto-checkbox', 'data-concepto': 'vacaciones'}),
+            'incluir_prima_vacacional': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 concepto-checkbox', 'data-concepto': 'prima_vacacional'}),
+            'incluir_prima_antiguedad': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 concepto-checkbox', 'data-concepto': 'prima_antiguedad'}),
+            'incluir_indemnizacion': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 concepto-checkbox', 'data-concepto': 'indemnizacion'}),
+            'incluir_indemnizacion_20dias': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 concepto-checkbox', 'data-concepto': 'indemnizacion_20dias'}),
+            'incluir_vacaciones_vencidas': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 concepto-checkbox', 'data-concepto': 'vacaciones_vencidas'}),
+            'incluir_horas_extras': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 concepto-checkbox', 'data-concepto': 'horas_extras'}),
+            'incluir_salarios_devengados': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 concepto-checkbox', 'data-concepto': 'salarios_devengados'}),
+            'incluir_dias_festivos': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 concepto-checkbox', 'data-concepto': 'dias_festivos'}),
+            # Inputs para conceptos semi-automáticos
+            'dias_vacaciones_vencidos': forms.NumberInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                'placeholder': '0 días',
+                'min': '0',
+            }),
+            'horas_extra_cantidad': forms.NumberInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                'placeholder': '0 horas',
+                'min': '0',
+                'step': '0.5',
+            }),
+            'salarios_devengados': forms.NumberInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                'placeholder': '$0.00',
+                'min': '0',
+                'step': '0.01',
+            }),
+            'dias_festivos_cantidad': forms.NumberInput(attrs={
+                'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+                'placeholder': '0 días',
+                'min': '0',
+            }),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Hacer que los campos de entrada no sean requeridos (dependen del checkbox)
+        for field_name in ['dias_vacaciones_vencidos', 'horas_extra_cantidad',
+                            'salarios_devengados', 'dias_festivos_cantidad']:
+            self.fields[field_name].required = False
 
 
 class SimulacionForm(forms.Form):

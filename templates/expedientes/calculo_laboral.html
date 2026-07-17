@@ -9,7 +9,7 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
             <h1 class="text-base font-bold text-gray-900 flex items-center gap-2">
-                <img src="{% static 'svg/calculator.svg' %}" class="w-5 h-5 icon-darkblue">
+                <span class="text-lg">📊</span>
                 Cálculo Laboral
             </h1>
             <p class="text-gray-600 mt-0.5 text-xs">
@@ -25,20 +25,17 @@
                 ← Volver
             </a>
             {% if datos_completos %}
-            <form method="POST" class="inline">
-                {% csrf_token %}
-                <button type="submit" name="recalcular" value="1"
-                        class="px-3 py-1.5 bg-gray-800 text-white rounded hover:bg-gray-700 transition text-xs font-medium">
-                    🔄 Recalcular
-                </button>
-            </form>
+            <button type="submit" form="calculo-form"
+                    class="px-3 py-1.5 bg-gray-800 text-white rounded hover:bg-gray-700 transition text-xs font-medium">
+                🔄 Recalcular
+            </button>
             {% endif %}
         </div>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        <!-- Columna izquierda: Datos del cálculo -->
+        <!-- Columna izquierda: Cálculo -->
         <div class="lg:col-span-2 space-y-6">
 
             {% if not datos_completos %}
@@ -71,10 +68,13 @@
             </div>
             {% endif %}
 
-            <!-- Tarjeta: Resultados Principales -->
+            <!-- Tarjeta: Resultados -->
             <div class="bg-white rounded shadow-sm border border-gray-200 overflow-hidden">
                 <div class="bg-gray-800 px-4 py-2.5">
-                    <h2 class="text-sm font-bold text-white flex items-center gap-1.5"><img src="{% static 'svg/account-cash.svg' %}" class="w-4 h-4" style="filter: brightness(0) invert(1);"> Resultados del Cálculo</h2>
+                    <h2 class="text-sm font-bold text-white flex items-center gap-1.5">
+                        <span class="text-lg">📋</span>
+                        Resultados del Cálculo
+                    </h2>
                     {% if calculo.recalculado_en %}
                     <p class="text-gray-400 text-xs mt-0.5">
                         Último recálculo: {{ calculo.recalculado_en|date:"d/m/Y H:i" }}
@@ -83,9 +83,11 @@
                 </div>
 
                 {% if datos_completos %}
-                <div class="p-6">
+                <form id="calculo-form" method="POST">
+                    {% csrf_token %}
+
                     <!-- Datos base -->
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 border-b border-gray-200">
                         <div>
                             <p class="text-xs text-gray-500 uppercase tracking-wider">Salario Mensual</p>
                             <p class="text-lg font-bold text-gray-900">${{ calculo.salario_mensual|floatformat:2|intcomma }}</p>
@@ -105,121 +107,254 @@
                     </div>
 
                     <!-- Tabla de prestaciones -->
-                    <div class="overflow-hidden rounded-lg border border-gray-200">
+                    <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th>
-                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Base Legal</th>
-                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Monto</th>
+                                    <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">Incluir</th>
+                                    <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Concepto</th>
+                                    <th scope="col" class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Base Legal</th>
+                                    <th scope="col" class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Datos</th>
+                                    <th scope="col" class="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Monto</th>
                                 </tr>
                             </thead>
-                            <tbody class="bg-white divide-y divide-gray-200">
+                            <tbody class="bg-white divide-y divide-gray-200" id="conceptos-tbody">
+
+                                <!-- ═══ CONCEPTOS EXISTENTES ═══ -->
+
                                 <!-- Aguinaldo -->
-                                <tr class="hover:bg-gray-50 transition">
-                                    <td class="px-6 py-4">
+                                <tr class="hover:bg-gray-50 transition concepto-row" data-concepto="aguinaldo">
+                                    <td class="px-3 py-3 text-center">
+                                        {{ form.incluir_aguinaldo }}
+                                    </td>
+                                    <td class="px-3 py-3">
                                         <div class="flex items-center gap-2">
-                                            <span class="text-lg">🎄</span>
+                                            <span>🎄</span>
                                             <div>
-                                                <p class="font-medium text-gray-900">Aguinaldo Proporcional</p>
-                                                <p class="text-xs text-gray-500">{{ config_legal.aguinaldo_dias }} días × proporcional</p>
+                                                <p class="font-medium text-gray-900 text-sm">Aguinaldo Proporcional</p>
                                             </div>
                                         </div>
                                     </td>
-                                    <td class="px-6 py-4 text-right text-sm text-gray-500">
-                                        Art. 76 LFT
+                                    <td class="px-3 py-3 text-sm text-gray-500">Art. 87 LFT</td>
+                                    <td class="px-3 py-3 text-right text-sm text-gray-500">
+                                        {{ config_legal.aguinaldo_dias|default:"15" }} días × proporcional
                                     </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <span class="text-lg font-bold text-green-700">${{ calculo.aguinaldo|floatformat:2|intcomma }}</span>
+                                    <td class="px-3 py-3 text-right concepto-monto" data-monto="{{ calculo.aguinaldo|floatformat:2 }}">
+                                        <span class="text-base font-bold text-green-700">${{ calculo.aguinaldo|floatformat:2|intcomma }}</span>
                                     </td>
                                 </tr>
 
                                 <!-- Vacaciones -->
-                                <tr class="hover:bg-gray-50 transition">
-                                    <td class="px-6 py-4">
+                                <tr class="hover:bg-gray-50 transition concepto-row" data-concepto="vacaciones">
+                                    <td class="px-3 py-3 text-center">
+                                        {{ form.incluir_vacaciones }}
+                                    </td>
+                                    <td class="px-3 py-3">
                                         <div class="flex items-center gap-2">
-                                            <span class="text-lg">🏖️</span>
+                                            <span>🏖️</span>
                                             <div>
-                                                <p class="font-medium text-gray-900">Vacaciones Proporcionales</p>
-                                                <p class="text-xs text-gray-500">{{ calculo.dias_vacaciones }} días según antigüedad</p>
+                                                <p class="font-medium text-gray-900 text-sm">Vacaciones Proporcionales</p>
                                             </div>
                                         </div>
                                     </td>
-                                    <td class="px-6 py-4 text-right text-sm text-gray-500">
-                                        Art. 76 LFT
+                                    <td class="px-3 py-3 text-sm text-gray-500">Art. 76 LFT</td>
+                                    <td class="px-3 py-3 text-right text-sm text-gray-500">
+                                        {{ calculo.dias_vacaciones }} días
                                     </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <span class="text-lg font-bold text-green-700">${{ calculo.vacaciones|floatformat:2|intcomma }}</span>
+                                    <td class="px-3 py-3 text-right concepto-monto" data-monto="{{ calculo.vacaciones|floatformat:2 }}">
+                                        <span class="text-base font-bold text-green-700">${{ calculo.vacaciones|floatformat:2|intcomma }}</span>
                                     </td>
                                 </tr>
 
                                 <!-- Prima Vacacional -->
-                                <tr class="hover:bg-gray-50 transition">
-                                    <td class="px-6 py-4">
+                                <tr class="hover:bg-gray-50 transition concepto-row" data-concepto="prima_vacacional">
+                                    <td class="px-3 py-3 text-center">
+                                        {{ form.incluir_prima_vacacional }}
+                                    </td>
+                                    <td class="px-3 py-3">
                                         <div class="flex items-center gap-2">
-                                            <span class="text-lg">✈️</span>
+                                            <span>✈️</span>
                                             <div>
-                                                <p class="font-medium text-gray-900">Prima Vacacional</p>
-                                                <p class="text-xs text-gray-500">{{ config_legal.prima_vacacional_porcentaje|floatformat:0 }}% de las vacaciones</p>
+                                                <p class="font-medium text-gray-900 text-sm">Prima Vacacional</p>
                                             </div>
                                         </div>
                                     </td>
-                                    <td class="px-6 py-4 text-right text-sm text-gray-500">
-                                        Art. 80 LFT
+                                    <td class="px-3 py-3 text-sm text-gray-500">Art. 80 LFT</td>
+                                    <td class="px-3 py-3 text-right text-sm text-gray-500">
+                                        {{ config_legal.prima_vacacional_porcentaje|floatformat:0 }}%
                                     </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <span class="text-lg font-bold text-green-700">${{ calculo.prima_vacacional|floatformat:2|intcomma }}</span>
+                                    <td class="px-3 py-3 text-right concepto-monto" data-monto="{{ calculo.prima_vacacional|floatformat:2 }}">
+                                        <span class="text-base font-bold text-green-700">${{ calculo.prima_vacacional|floatformat:2|intcomma }}</span>
                                     </td>
                                 </tr>
 
                                 <!-- Prima de Antigüedad -->
-                                <tr class="hover:bg-gray-50 transition">
-                                    <td class="px-6 py-4">
+                                <tr class="hover:bg-gray-50 transition concepto-row" data-concepto="prima_antiguedad">
+                                    <td class="px-3 py-3 text-center">
+                                        {{ form.incluir_prima_antiguedad }}
+                                    </td>
+                                    <td class="px-3 py-3">
                                         <div class="flex items-center gap-2">
-                                            <span class="text-lg">📜</span>
+                                            <span>📜</span>
                                             <div>
-                                                <p class="font-medium text-gray-900">Prima de Antigüedad</p>
-                                                <p class="text-xs text-gray-500">
-                                                    {{ config_legal.prima_antiguedad_dias_por_ano }} días/año
-                                                    {% if calculo.tope_salarial_aplicado %}(con tope aplicado){% endif %}
-                                                </p>
+                                                <p class="font-medium text-gray-900 text-sm">Prima de Antigüedad</p>
+                                                {% if calculo.tope_salarial_aplicado %}
+                                                <span class="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">Tope aplicado</span>
+                                                {% endif %}
                                             </div>
                                         </div>
                                     </td>
-                                    <td class="px-6 py-4 text-right text-sm text-gray-500">
-                                        Art. 162 LFT
+                                    <td class="px-3 py-3 text-sm text-gray-500">Art. 162 LFT</td>
+                                    <td class="px-3 py-3 text-right text-sm text-gray-500">
+                                        {{ config_legal.prima_antiguedad_dias_por_ano }} días/año
                                     </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <span class="text-lg font-bold text-green-700">${{ calculo.prima_antiguedad|floatformat:2|intcomma }}</span>
+                                    <td class="px-3 py-3 text-right concepto-monto" data-monto="{{ calculo.prima_antiguedad|floatformat:2 }}">
+                                        <span class="text-base font-bold text-green-700">${{ calculo.prima_antiguedad|floatformat:2|intcomma }}</span>
                                     </td>
                                 </tr>
 
-                                <!-- Indemnización Constitucional -->
-                                <tr class="hover:bg-gray-50 transition">
-                                    <td class="px-6 py-4">
+                                <!-- Indemnización 90 días -->
+                                <tr class="hover:bg-gray-50 transition concepto-row" data-concepto="indemnizacion">
+                                    <td class="px-3 py-3 text-center">
+                                        {{ form.incluir_indemnizacion }}
+                                    </td>
+                                    <td class="px-3 py-3">
                                         <div class="flex items-center gap-2">
-                                            <span class="text-lg">⚖️</span>
+                                            <span>⚖️</span>
                                             <div>
-                                                <p class="font-medium text-gray-900">Indemnización Constitucional</p>
-                                                <p class="text-xs text-gray-500">{{ config_legal.indemnizacion_dias }} días (3 meses)</p>
+                                                <p class="font-medium text-gray-900 text-sm">Indemnización Constitucional</p>
                                             </div>
                                         </div>
                                     </td>
-                                    <td class="px-6 py-4 text-right text-sm text-gray-500">
-                                        Art. 50 LFT
+                                    <td class="px-3 py-3 text-sm text-gray-500">Art. 50 LFT</td>
+                                    <td class="px-3 py-3 text-right text-sm text-gray-500">
+                                        {{ config_legal.indemnizacion_dias }} días (3 meses)
                                     </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <span class="text-lg font-bold text-green-700">${{ calculo.indemnizacion|floatformat:2|intcomma }}</span>
+                                    <td class="px-3 py-3 text-right concepto-monto" data-monto="{{ calculo.indemnizacion|floatformat:2 }}">
+                                        <span class="text-base font-bold text-green-700">${{ calculo.indemnizacion|floatformat:2|intcomma }}</span>
                                     </td>
                                 </tr>
+
+                                <!-- ═══ NUEVOS CONCEPTOS ═══ -->
+
+                                <!-- Indemnización 20 días por año -->
+                                <tr class="hover:bg-gray-50 transition concepto-row {% if not calculo.incluir_indemnizacion_20dias %}opacity-50{% endif %}" data-concepto="indemnizacion_20dias">
+                                    <td class="px-3 py-3 text-center">
+                                        {{ form.incluir_indemnizacion_20dias }}
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        <div class="flex items-center gap-2">
+                                            <span>📆</span>
+                                            <div>
+                                                <p class="font-medium text-gray-900 text-sm">Indemnización 20 días por año</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-3 py-3 text-sm text-gray-500">Art. 50 Frac. II LFT</td>
+                                    <td class="px-3 py-3 text-right text-sm text-gray-500">
+                                        {{ calculo.años_trabajados|floatformat:2 }} años × 20 días
+                                    </td>
+                                    <td class="px-3 py-3 text-right concepto-monto" data-monto="{{ calculo.indemnizacion_20dias|floatformat:2 }}">
+                                        <span class="text-base font-bold text-green-700">${{ calculo.indemnizacion_20dias|floatformat:2|intcomma }}</span>
+                                    </td>
+                                </tr>
+
+                                <!-- Vacaciones Vencidas -->
+                                <tr class="hover:bg-gray-50 transition concepto-row {% if not calculo.incluir_vacaciones_vencidas %}opacity-50{% endif %}" data-concepto="vacaciones_vencidas">
+                                    <td class="px-3 py-3 text-center">
+                                        {{ form.incluir_vacaciones_vencidas }}
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        <div class="flex items-center gap-2">
+                                            <span>🗓️</span>
+                                            <div>
+                                                <p class="font-medium text-gray-900 text-sm">Vacaciones Vencidas</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-3 py-3 text-sm text-gray-500">Art. 76 LFT</td>
+                                    <td class="px-3 py-3 text-right">
+                                        {{ form.dias_vacaciones_vencidos }}
+                                    </td>
+                                    <td class="px-3 py-3 text-right concepto-monto" data-monto="{{ calculo.vacaciones_vencidas|floatformat:2 }}">
+                                        <span class="text-base font-bold text-green-700">${{ calculo.vacaciones_vencidas|floatformat:2|intcomma }}</span>
+                                    </td>
+                                </tr>
+
+                                <!-- Horas Extras -->
+                                <tr class="hover:bg-gray-50 transition concepto-row {% if not calculo.incluir_horas_extras %}opacity-50{% endif %}" data-concepto="horas_extras">
+                                    <td class="px-3 py-3 text-center">
+                                        {{ form.incluir_horas_extras }}
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        <div class="flex items-center gap-2">
+                                            <span>⏰</span>
+                                            <div>
+                                                <p class="font-medium text-gray-900 text-sm">Horas Extras</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-3 py-3 text-sm text-gray-500">Art. 66-68 LFT</td>
+                                    <td class="px-3 py-3 text-right">
+                                        {{ form.horas_extra_cantidad }}
+                                    </td>
+                                    <td class="px-3 py-3 text-right concepto-monto" data-monto="{{ calculo.horas_extras|floatformat:2 }}">
+                                        <span class="text-base font-bold text-green-700">${{ calculo.horas_extras|floatformat:2|intcomma }}</span>
+                                    </td>
+                                </tr>
+
+                                <!-- Salarios Devengados -->
+                                <tr class="hover:bg-gray-50 transition concepto-row {% if not calculo.incluir_salarios_devengados %}opacity-50{% endif %}" data-concepto="salarios_devengados">
+                                    <td class="px-3 py-3 text-center">
+                                        {{ form.incluir_salarios_devengados }}
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        <div class="flex items-center gap-2">
+                                            <span>💰</span>
+                                            <div>
+                                                <p class="font-medium text-gray-900 text-sm">Salarios Devengados</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-3 py-3 text-sm text-gray-500">Art. 48 LFT</td>
+                                    <td class="px-3 py-3 text-right">
+                                        {{ form.salarios_devengados }}
+                                    </td>
+                                    <td class="px-3 py-3 text-right concepto-monto" data-monto="{{ calculo.salarios_devengados|floatformat:2 }}">
+                                        <span class="text-base font-bold text-green-700">${{ calculo.salarios_devengados|floatformat:2|intcomma }}</span>
+                                    </td>
+                                </tr>
+
+                                <!-- Días Festivos -->
+                                <tr class="hover:bg-gray-50 transition concepto-row {% if not calculo.incluir_dias_festivos %}opacity-50{% endif %}" data-concepto="dias_festivos">
+                                    <td class="px-3 py-3 text-center">
+                                        {{ form.incluir_dias_festivos }}
+                                    </td>
+                                    <td class="px-3 py-3">
+                                        <div class="flex items-center gap-2">
+                                            <span>🎉</span>
+                                            <div>
+                                                <p class="font-medium text-gray-900 text-sm">Días Festivos</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="px-3 py-3 text-sm text-gray-500">Art. 75 LFT</td>
+                                    <td class="px-3 py-3 text-right">
+                                        {{ form.dias_festivos_cantidad }}
+                                    </td>
+                                    <td class="px-3 py-3 text-right concepto-monto" data-monto="{{ calculo.dias_festivos|floatformat:2 }}">
+                                        <span class="text-base font-bold text-green-700">${{ calculo.dias_festivos|floatformat:2|intcomma }}</span>
+                                    </td>
+                                </tr>
+
                             </tbody>
                             <tfoot class="bg-blue-50">
                                 <tr>
-                                    <td colspan="2" class="px-6 py-4 text-right">
+                                    <td colspan="4" class="px-3 py-4 text-right">
                                         <span class="text-lg font-bold text-blue-900">TOTAL PRESTACIONES</span>
                                     </td>
-                                    <td class="px-6 py-4 text-right">
-                                        <span class="text-2xl font-extrabold text-blue-700">${{ calculo.total|floatformat:2|intcomma }}</span>
+                                    <td class="px-3 py-4 text-right">
+                                        <span class="text-2xl font-extrabold text-blue-700" id="total-prestaciones">${{ calculo.total|floatformat:2|intcomma }}</span>
                                     </td>
                                 </tr>
                             </tfoot>
@@ -227,17 +362,32 @@
                     </div>
 
                     {% if calculo.tope_salarial_aplicado %}
-                    <div class="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div class="mx-4 mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
                         <p class="text-sm text-amber-700">
-                            ⚠️ <strong>Tope salarial aplicado</strong> en la prima de antigüedad.
-                            El salario del trabajador excede el tope legal de
-                            ${{ config_legal.tope_prima_multiplo|default:2 }} ×
-                            {% if config_legal.tope_prima_tipo == 'uma' %}UMA{% elif config_legal.tope_prima_tipo == 'frontera' %}Salario Mínimo Frontera{% else %}Salario Mínimo{% endif %}
-                            (${{ calculo.salario_diario|floatformat:2 }} → tope aplicado).
+                            ⚠️ <strong>Tope salarial aplicado</strong> en prima de antigüedad.
+                            El salario (${{ calculo.salario_diario|floatformat:2|intcomma }}) excede el tope legal.
                         </p>
                     </div>
                     {% endif %}
-                </div>
+
+                    <!-- Notas y periodo de pago -->
+                    <div class="p-4 border-t border-gray-200">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 mb-0.5">Período de pago</label>
+                                {{ form.periodo_pago }}
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 mb-0.5">Notas</label>
+                                {{ form.notas }}
+                            </div>
+                        </div>
+                        <button type="submit"
+                                class="px-4 py-1.5 bg-gray-800 text-white rounded hover:bg-gray-700 transition text-sm font-medium">
+                            💾 Guardar y Recalcular
+                        </button>
+                    </div>
+                </form>
                 {% else %}
                 <div class="p-12 text-center text-gray-500">
                     <span class="text-5xl">📊</span>
@@ -245,38 +395,20 @@
                 </div>
                 {% endif %}
             </div>
-
-            <!-- Notas del cálculo -->
-            <div class="bg-white rounded shadow-sm border border-gray-200 p-4">
-                <h3 class="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-1.5"><img src="{% static 'svg/text-box-edit-outline.svg' %}" class="w-4 h-4 icon-darkblue"> Notas del Cálculo</h3>
-                <form method="POST">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <label class="block text-xs font-medium text-gray-700 mb-0.5">Período de pago</label>
-                        {{ form.periodo_pago }}
-                    </div>
-                    <div class="mb-3">
-                        <label class="block text-xs font-medium text-gray-700 mb-0.5">Notas</label>
-                        {{ form.notas }}
-                    </div>
-                    <button type="submit"
-                            class="px-3 py-1.5 text-sm bg-gray-800 text-white rounded hover:bg-gray-700 transition font-medium">
-                        💾 Guardar cambios
-                    </button>
-                </form>
-            </div>
         </div>
 
-        <!-- Columna derecha: Simulación rápida + Config legal -->
+        <!-- Columna derecha: Simulación + Config + Datos Cliente -->
         <div class="space-y-6">
 
             <!-- Simulación Rápida -->
             <div class="bg-white rounded shadow-sm border border-gray-200 overflow-hidden">
                 <div class="bg-gray-800 px-4 py-2.5">
-                    <h2 class="text-sm font-bold text-white flex items-center gap-1.5"><img src="{% static 'svg/calculator.svg' %}" class="w-4 h-4" style="filter: brightness(0) invert(1);"> Simulación Rápida</h2>
+                    <h2 class="text-sm font-bold text-white flex items-center gap-1.5">
+                        <span class="text-lg">🔮</span>
+                        Simulación Rápida
+                    </h2>
                     <p class="text-gray-400 text-[10px] mt-0.5">Estima prestaciones sin crear expediente</p>
                 </div>
-
                 <div class="p-4">
                     <form id="simulacion-form" method="POST" action="{% url 'simulacion_rapida' %}">
                         {% csrf_token %}
@@ -303,8 +435,6 @@
                             </button>
                         </div>
                     </form>
-
-                    <!-- Resultado de simulación -->
                     <div id="simulacion-resultado" class="mt-4"></div>
                 </div>
             </div>
@@ -338,7 +468,7 @@
                 {% endif %}
             </div>
 
-            <!-- Información de contacto del cliente -->
+            <!-- Datos del Cliente -->
             <div class="bg-white rounded shadow-sm border border-gray-200 p-3">
                 <h3 class="text-xs font-semibold text-gray-900 mb-2 uppercase tracking-wider">📋 Datos del Cliente</h3>
                 <dl class="space-y-2 text-sm">
@@ -371,26 +501,56 @@
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const form = document.getElementById('simulacion-form');
-        const resultado = document.getElementById('simulacion-resultado');
+document.addEventListener('DOMContentLoaded', function() {
+    // ─── Checkbox toggle: ocultar/mostrar filas ─────────────────────────
+    const checkboxes = document.querySelectorAll('.concepto-checkbox');
+    checkboxes.forEach(function(cb) {
+        cb.addEventListener('change', function() {
+            const row = this.closest('.concepto-row');
+            if (row) {
+                if (this.checked) {
+                    row.classList.remove('opacity-50');
+                } else {
+                    row.classList.add('opacity-50');
+                }
+            }
+            actualizarTotal();
+        });
+    });
 
+    // ─── Actualizar total visual ───────────────────────────────────────
+    function actualizarTotal() {
+        let total = 0;
+        document.querySelectorAll('.concepto-row').forEach(function(row) {
+            const cb = row.querySelector('.concepto-checkbox');
+            const montoEl = row.querySelector('.concepto-monto');
+            if (cb && montoEl && cb.checked) {
+                total += parseFloat(montoEl.dataset.monto || 0);
+            }
+        });
+        const totalEl = document.getElementById('total-prestaciones');
+        if (totalEl) {
+            totalEl.textContent = '$' + total.toLocaleString('es-MX', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+    }
+
+    // ─── Simulación ────────────────────────────────────────────────────
+    const form = document.getElementById('simulacion-form');
+    const resultado = document.getElementById('simulacion-resultado');
+    if (form && resultado) {
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
-
             resultado.innerHTML = '<div class="text-center py-4 text-gray-500">⏳ Calculando...</div>';
-
             try {
                 const response = await fetch(this.action, {
                     method: 'POST',
                     body: new FormData(this),
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 });
                 const html = await response.text();
                 resultado.innerHTML = html;
@@ -398,6 +558,10 @@
                 resultado.innerHTML = '<div class="text-center py-4 text-red-500">Error al calcular. Intenta de nuevo.</div>';
             }
         });
-    });
+    }
+
+    // Actualizar total al cargar
+    actualizarTotal();
+});
 </script>
 {% endblock %}

@@ -189,17 +189,116 @@ def indemnizacion_constitucional(salario_diario_valor: Decimal) -> Decimal:
     return _decimal(Decimal('90') * salario_diario_valor)
 
 
-# ─── 6. Total General ──────────────────────────────────────────────────────
+# ─── 6. Indemnización 20 días por año ──────────────────────────────────────
+
+def indemnizacion_20dias_por_ano(
+    años_trabajados: Decimal,
+    salario_diario_valor: Decimal,
+    salario_tope: Optional[Decimal] = None
+) -> Decimal:
+    """
+    Indemnización 20 días de salario por cada año de servicios.
+
+    Conforme al artículo 50 fracción II LFT: 20 días de salario
+    por cada año de servicios prestados, con tope de 2 × UMA/SM.
+
+    Args:
+        años_trabajados: Años trabajados (incluye fracción)
+        salario_diario_valor: Salario diario (se aplica tope)
+        salario_tope: Tope salarial diario
+
+    Returns:
+        Indemnización 20 días por año
+    """
+    if años_trabajados <= 0 or salario_diario_valor <= 0:
+        return Decimal('0')
+    salario_base = salario_diario_valor
+    if salario_tope is not None and salario_diario_valor > salario_tope:
+        salario_base = salario_tope
+    return _decimal(Decimal('20') * años_trabajados * salario_base)
+
+
+# ─── 7. Vacaciones Vencidas ───────────────────────────────────────────────
+
+def vacaciones_vencidas(
+    dias_vencidos: int,
+    salario_diario_valor: Decimal
+) -> Decimal:
+    """
+    Vacaciones vencidas de años anteriores no pagadas.
+
+    Args:
+        dias_vencidos: Días de vacaciones no pagadas de años anteriores
+        salario_diario_valor: Salario diario del trabajador
+
+    Returns:
+        Monto de vacaciones vencidas
+    """
+    if dias_vencidos <= 0 or salario_diario_valor <= 0:
+        return Decimal('0')
+    return _decimal(Decimal(str(dias_vencidos)) * salario_diario_valor)
+
+
+# ─── 8. Horas Extras ──────────────────────────────────────────────────────
+
+def horas_extras(
+    cantidad_horas: Decimal,
+    salario_diario_valor: Decimal
+) -> Decimal:
+    """
+    Cálculo de horas extra (doble + triple).
+    
+    Se calcula el valor hora ordinario y se aplica:
+    - Horas extra dobles (primeras 9 hrs/semana): 2× valor hora
+    - Horas extra triples (excedentes): 3× valor hora
+    
+    Para simplificar, se usa un factor promedio de 2.5× por hora.
+
+    Args:
+        cantidad_horas: Número total de horas extra
+        salario_diario_valor: Salario diario del trabajador
+
+    Returns:
+        Monto de horas extra
+    """
+    if cantidad_horas <= 0 or salario_diario_valor <= 0:
+        return Decimal('0')
+    # Valor hora ordinario = salario diario / 8 horas
+    valor_hora = salario_diario_valor / Decimal('8')
+    # Factor promedio ponderado: dobles (2) y triples (3) → ~2.5
+    return _decimal(cantidad_horas * valor_hora * Decimal('2.5'))
+
+
+# ─── 9. Días Festivos ─────────────────────────────────────────────────────
+
+def dias_festivos(
+    cantidad_dias: int,
+    salario_diario_valor: Decimal
+) -> Decimal:
+    """
+    Días festivos laborados no pagados.
+    
+    Conforme al Art. 75 LFT: si se trabaja en día festivo,
+    se paga triple (salario ordinario + 200% extra).
+    Monto = días × salario_diario × 3
+
+    Args:
+        cantidad_dias: Número de días festivos trabajados
+        salario_diario_valor: Salario diario del trabajador
+
+    Returns:
+        Monto de días festivos
+    """
+    if cantidad_dias <= 0 or salario_diario_valor <= 0:
+        return Decimal('0')
+    return _decimal(Decimal(str(cantidad_dias)) * salario_diario_valor * Decimal('3'))
+
+
+# ─── 10. Total General ────────────────────────────────────────────────────────
 
 def total_prestaciones(
-    aguinaldo: Decimal,
-    vacaciones: Decimal,
-    prima_vac: Decimal,
-    prima_ant: Decimal,
-    indemnizacion: Optional[Decimal] = None
+    *montos: Decimal
 ) -> Decimal:
     """Suma todas las prestaciones calculadas."""
-    total = aguinaldo + vacaciones + prima_vac + prima_ant
-    if indemnizacion:
-        total += indemnizacion
-    return _decimal(total)
+    suma = sum(montos, Decimal('0'))
+    return _decimal(suma)

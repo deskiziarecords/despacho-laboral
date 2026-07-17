@@ -98,7 +98,7 @@ class Cliente(models.Model):
     )
     oficina = models.CharField(
         'Oficina que atendió', max_length=30,
-        choices=OFICINA_CHOICES, blank=True,
+        choices=OFICINA_CHOICES,
         help_text='¿Cuál oficina atendió al cliente?'
     )
 
@@ -551,6 +551,7 @@ class CalculoLaboral(models.Model):
     """Resultado de cálculos laborales vinculado a un expediente.
     
     Se recalcula automáticamente si cambian los datos del cliente/expediente.
+    El asesor puede seleccionar qué conceptos incluir mediante checkboxes.
     """
 
     PERIODO_PAGO_CHOICES = [
@@ -572,14 +573,49 @@ class CalculoLaboral(models.Model):
     dias_trabajados = models.PositiveIntegerField('Días trabajados', default=0)
     años_trabajados = models.DecimalField('Años trabajados', max_digits=6, decimal_places=4, default=0)
 
-    # Resultados
+    # ─── Checkboxes de selección de conceptos ───────────────────────
+    incluir_aguinaldo = models.BooleanField('Incluir aguinaldo', default=True)
+    incluir_vacaciones = models.BooleanField('Incluir vacaciones', default=True)
+    incluir_prima_vacacional = models.BooleanField('Incluir prima vacacional', default=True)
+    incluir_prima_antiguedad = models.BooleanField('Incluir prima antigüedad', default=True)
+    incluir_indemnizacion = models.BooleanField('Incluir indemnización 90 días', default=True)
+    incluir_indemnizacion_20dias = models.BooleanField('Incluir 20 días por año', default=False)
+    incluir_vacaciones_vencidas = models.BooleanField('Incluir vacaciones vencidas', default=False)
+    incluir_horas_extras = models.BooleanField('Incluir horas extras', default=False)
+    incluir_salarios_devengados = models.BooleanField('Incluir salarios devengados', default=False)
+    incluir_dias_festivos = models.BooleanField('Incluir días festivos', default=False)
+
+    # ─── Resultados existentes ──────────────────────────────────────
     aguinaldo = models.DecimalField('Aguinaldo proporcional', max_digits=12, decimal_places=2, default=0)
     vacaciones = models.DecimalField('Vacaciones proporcionales', max_digits=12, decimal_places=2, default=0)
     dias_vacaciones = models.PositiveIntegerField('Días de vacaciones según antigüedad', default=0)
     prima_vacacional = models.DecimalField('Prima vacacional', max_digits=12, decimal_places=2, default=0)
     prima_antiguedad = models.DecimalField('Prima de antigüedad', max_digits=12, decimal_places=2, default=0)
     tope_salarial_aplicado = models.BooleanField('Tope salarial aplicado', default=False)
-    indemnizacion = models.DecimalField('Indemnización constitucional', max_digits=12, decimal_places=2, default=0)
+    indemnizacion = models.DecimalField('Indemnización constitucional (90 días)', max_digits=12, decimal_places=2, default=0)
+
+    # ─── Nuevos resultados ──────────────────────────────────────────
+    indemnizacion_20dias = models.DecimalField('Indemnización 20 días por año', max_digits=12, decimal_places=2, default=0)
+
+    # Vacaciones vencidas (input manual de días)
+    dias_vacaciones_vencidos = models.PositiveIntegerField('Días de vacaciones vencidas', default=0,
+        help_text='Días de vacaciones de años anteriores que no se pagaron')
+    vacaciones_vencidas = models.DecimalField('Vacaciones vencidas', max_digits=12, decimal_places=2, default=0)
+
+    # Horas extras (input manual de horas)
+    horas_extra_cantidad = models.DecimalField('Cantidad de horas extra', max_digits=8, decimal_places=2, default=0,
+        help_text='Número total de horas extra trabajadas')
+    horas_extras = models.DecimalField('Horas extras', max_digits=12, decimal_places=2, default=0)
+
+    # Salarios devengados (input manual de monto)
+    salarios_devengados = models.DecimalField('Salarios devengados', max_digits=12, decimal_places=2, default=0,
+        help_text='Monto de salarios no pagados')
+
+    # Días festivos (input manual de días)
+    dias_festivos_cantidad = models.PositiveIntegerField('Cantidad de días festivos', default=0,
+        help_text='Número de días festivos laborados no pagados')
+    dias_festivos = models.DecimalField('Días festivos', max_digits=12, decimal_places=2, default=0)
+
     total = models.DecimalField('Total prestaciones', max_digits=12, decimal_places=2, default=0)
 
     # Metadatos

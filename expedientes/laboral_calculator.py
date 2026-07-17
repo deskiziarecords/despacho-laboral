@@ -17,12 +17,18 @@ from django.utils import timezone
 from core.laboral import calculators, rules
 
 
-def calcular_desde_expediente(expediente) -> Dict[str, Any]:
+def calcular_desde_expediente(
+    expediente,
+    conceptos_seleccionados: Optional[Dict[str, bool]] = None,
+    datos_extra: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """
     Ejecuta el cálculo completo usando los datos del expediente y su cliente.
 
     Args:
         expediente: Instancia del modelo Expediente
+        conceptos_seleccionados: Dict con booleanos para incluir/excluir conceptos
+        datos_extra: Dict con datos extra (días vencidos, horas extra, etc.)
 
     Returns:
         Dict con resultados de calcular_todo()
@@ -38,7 +44,6 @@ def calcular_desde_expediente(expediente) -> Dict[str, Any]:
     periodo_pago = 'mensual'
     try:
         if hasattr(expediente, 'solicitud') and expediente.solicitud.periodo_pago:
-            # Mapear periodo de solicitud a periodo de cálculo
             mapa = {'diario': 'diario', 'semanal': 'semanal', 'quincenal': 'quincenal'}
             periodo_pago = mapa.get(expediente.solicitud.periodo_pago, 'mensual')
     except Exception:
@@ -54,30 +59,55 @@ def calcular_desde_expediente(expediente) -> Dict[str, Any]:
         fecha_salida=fecha_salida,
         salario=salario,
         periodo_pago=periodo_pago,
+        conceptos_seleccionados=conceptos_seleccionados,
+        datos_extra=datos_extra,
     )
 
 
 def recalcular_calculo(calculo_laboral) -> None:
     """
     Recalcula y actualiza los campos de una instancia de CalculoLaboral.
+    Respeta los conceptos seleccionados y datos extra guardados en la instancia.
     No guarda (el llamador debe hacer save()).
 
     Args:
         calculo_laboral: Instancia de CalculoLaboral
     """
     expediente = calculo_laboral.expediente
-    resultado = calcular_desde_expediente(expediente)
+
+    # Leer selección de conceptos desde la instancia
+    conceptos = {}
+    for key in ['incluir_aguinaldo', 'incluir_vacaciones', 'incluir_prima_vacacional',
+                 'incluir_prima_antiguedad', 'incluir_indemnizacion',
+                 'incluir_indemnizacion_20dias', 'incluir_vacaciones_vencidas',
+                 'incluir_horas_extras', 'incluir_salarios_devengados', 'incluir_dias_festivos']:
+        conceptos[key] = getattr(calculo_laboral, key, True)
+
+    datos_extra = {
+        'dias_vacaciones_vencidos': calculo_laboral.dias_vacaciones_vencidos or 0,
+        'horas_extra_cantidad': float(calculo_laboral.horas_extra_cantidad or 0),
+        'salarios_devengados': float(calculo_laboral.salarios_devengados or 0),
+        'dias_festivos_cantidad': calculo_laboral.dias_festivos_cantidad or 0,
+    }
+
+    resultado = calcular_desde_expediente(
+        expediente,
+        conceptos_seleccionados=conceptos,
+        datos_extra=datos_extra,
+    )
 
     if not resultado['success']:
         return
 
-    # Actualizar campos
+    # Actualizar campos base
     calculo_laboral.salario_mensual = expediente.cliente.salario or Decimal('0')
     calculo_laboral.salario_diario = resultado['salario_diario']
     calculo_laboral.fecha_ingreso = expediente.cliente.fecha_ingreso
     calculo_laboral.fecha_salida = expediente.cliente.fecha_salida
     calculo_laboral.dias_trabajados = resultado['dias_trabajados']
     calculo_laboral.años_trabajados = resultado['años_trabajados']
+
+    # Actualizar resultados existentes
     calculo_laboral.aguinaldo = resultado['aguinaldo']['monto']
     calculo_laboral.vacaciones = resultado['vacaciones']['monto']
     calculo_laboral.dias_vacaciones = resultado['vacaciones']['dias_segun_antiguedad']
@@ -85,5 +115,20 @@ def recalcular_calculo(calculo_laboral) -> None:
     calculo_laboral.prima_antiguedad = resultado['prima_antiguedad']['monto']
     calculo_laboral.tope_salarial_aplicado = resultado['prima_antiguedad']['tope_aplicado']
     calculo_laboral.indemnizacion = resultado['indemnizacion']['monto']
+
+    # Actualizar nuevos resultados
+    calculo_laboral.indemnizacion_20dias = resultado['indemnizacion_20dias']['monto']
+    calculo_laboral.vacaciones_vencidas = resultado['vacaciones_vencidas']['monto']
+    # No sobrescribir datos de input si ya están guardados
+    if not calculo_laboral.pk or resultado['vacaciones_vencidas']['dias'] > 0:
+        calculo_laboral.dias_vacaciones_vencidos = resultado['vacaciones_vencidas']['dias']
+    calculo_laboral.horas_extras = resultado['horas_extras']['monto']
+    if not calculo_laboral.pk or resultado['horas_extras']['cantidad'] > 0:
+        calculo_laboral.horas_extra_cantidad = resultado['horas_extras']['cantidad']
+    calculo_laboral.salarios_devengados = resultado['salarios_devengados']['monto']
+    calculo_laboral.dias_festivos = resultado['dias_festivos']['monto']
+    if not calculo_laboral.pk or resultado['dias_festivos']['dias'] > 0:
+        calculo_laboral.dias_festivos_cantidad = resultado['dias_festivos']['dias']
+
     calculo_laboral.total = resultado['total']
     calculo_laboral.recalculado_en = timezone.now()
