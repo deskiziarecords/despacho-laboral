@@ -73,6 +73,35 @@ class Cliente(models.Model):
     fecha_ingreso = models.DateField('Fecha de ingreso', null=True, blank=True)
     fecha_salida = models.DateField('Fecha de salida/despido', null=True, blank=True)
 
+    # Cómo se enteró del despacho
+    COMO_SUPO_CHOICES = [
+        ('facebook', 'Facebook / Instagram'),
+        ('google', 'Google / Internet'),
+        ('recomendacion', 'Recomendación'),
+        ('whatsapp', 'WhatsApp'),
+        ('tiktok', 'TikTok'),
+        ('tv_radio', 'Televisión / Radio'),
+        ('volante', 'Volante / Folleto'),
+        ('otro', 'Otro'),
+    ]
+
+    OFICINA_CHOICES = [
+        ('plaza_patria', 'Plaza Patria'),
+        ('plaza_patria_abajo', 'Plaza Patria Abajo'),
+        ('otay', 'Otay'),
+    ]
+
+    como_supo = models.CharField(
+        '¿Cómo supo de nosotros?', max_length=20,
+        choices=COMO_SUPO_CHOICES, blank=True,
+        help_text='¿Cómo se enteró el cliente de Conciliación Laboral Tijuana?'
+    )
+    oficina = models.CharField(
+        'Oficina que atendió', max_length=30,
+        choices=OFICINA_CHOICES, blank=True,
+        help_text='¿Cuál oficina atendió al cliente?'
+    )
+
     # Asesoría gratuita
     asesoria_gratuita_ofrecida = models.BooleanField(
         'Asesoría gratuita ofrecida', default=False,

@@ -64,6 +64,18 @@
                         {{ form.genero }}
                         {% if form.genero.errors %}<p class="text-red-500 text-xs mt-1">{{ form.genero.errors.0 }}</p>{% endif %}
                     </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.como_supo.label }}</label>
+                        {{ form.como_supo }}
+                        {% if form.como_supo.errors %}<p class="text-red-500 text-xs mt-1">{{ form.como_supo.errors.0 }}</p>{% endif %}
+                        <p class="text-xs text-gray-400 mt-0.5">¿Cómo se enteró de Conciliación Laboral Tijuana?</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ form.oficina.label }}</label>
+                        {{ form.oficina }}
+                        {% if form.oficina.errors %}<p class="text-red-500 text-xs mt-1">{{ form.oficina.errors.0 }}</p>{% endif %}
+                        <p class="text-xs text-gray-400 mt-0.5">¿Cuál oficina atendió al cliente?</p>
+                    </div>
                 </div>
             </div>
 
@@ -239,4 +251,125 @@
         </form>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+{% if not object %}
+<script>
+/**
+ * Generador automático de CURP desde nombre, fecha de nacimiento y género.
+ * Solo se activa en el formulario de NUEVO cliente (no en edición).
+ */
+document.addEventListener('DOMContentLoaded', function() {
+    const nombreInput = document.querySelector('[name="nombre"]');
+    const curpInput = document.querySelector('[name="curp"]');
+    const fechaInput = document.querySelector('[name="fecha_nacimiento"]');
+    const generoSelect = document.querySelector('[name="genero"]');
+
+    if (!nombreInput || !curpInput || !fechaInput || !generoSelect) return;
+
+    const ESTADO_BC = 'BC';
+    const VOCALES = 'AEIOUÁÉÍÓÚÜ';
+    const CONSONANTES = 'BCDFGHJKLMNÑPQRSTVWXYZ';
+
+    function limpiarNombre(str) {
+        return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    }
+
+    function getPrimeraLetra(str) {
+        return str.charAt(0);
+    }
+
+    function getPrimeraVocalInterna(str) {
+        const s = str.substring(1);
+        for (let i = 0; i < s.length; i++) {
+            if (VOCALES.includes(s[i])) return s[i];
+        }
+        return 'X';
+    }
+
+    function getPrimerConsonanteInterna(str) {
+        const s = str.substring(1);
+        for (let i = 0; i < s.length; i++) {
+            if (CONSONANTES.includes(s[i])) return s[i];
+        }
+        return 'X';
+    }
+
+    function generarCURP() {
+        const nombreCompleto = nombreInput.value.trim();
+        const fechaNac = fechaInput.value;
+        const genero = generoSelect.value;
+
+        if (!nombreCompleto || !fechaNac || !genero) return '';
+
+        const partes = nombreCompleto.trim().split(/\s+/).filter(p => p.length > 0);
+        if (partes.length < 2) return '';
+
+        let apellido1, apellido2, nombre1;
+
+        if (partes.length === 2) {
+            apellido1 = limpiarNombre(partes[0]);
+            apellido2 = '';
+            nombre1 = limpiarNombre(partes[1]);
+        } else {
+            apellido1 = limpiarNombre(partes[0]);
+            apellido2 = limpiarNombre(partes[1]);
+            nombre1 = limpiarNombre(partes[2]);
+        }
+
+        // Filtrar articulos comunes como segundo apellido
+        const comunes = ['DE', 'LA', 'LAS', 'LOS', 'DEL', 'Y', 'E', 'EL', 'MAC', 'MC', 'VON', 'VAN'];
+        if (comunes.includes(apellido2) && partes.length > 3) {
+            apellido2 = limpiarNombre(partes[2]);
+            nombre1 = partes.length > 3 ? limpiarNombre(partes[3]) : nombre1;
+        }
+
+        if (!apellido2) apellido2 = apellido1;
+
+        const letra1 = getPrimeraLetra(apellido1);
+        const letra2 = getPrimeraVocalInterna(apellido1);
+        const letra3 = getPrimeraLetra(apellido2);
+        const letra4 = getPrimeraLetra(nombre1);
+
+        const fechaParts = fechaNac.split('-');
+        const anio = fechaParts[0].substring(2);
+        const mes = fechaParts[1];
+        const dia = fechaParts[2];
+
+        const sexo = genero === 'masculino' ? 'H' : 'M';
+        const estado = ESTADO_BC;
+
+        const cons1 = getPrimerConsonanteInterna(apellido1);
+        const cons2 = getPrimerConsonanteInterna(apellido2);
+        const cons3 = getPrimerConsonanteInterna(nombre1);
+
+        // Homoclave simple basada en hash de los datos
+        const base = apellido1 + apellido2 + nombre1 + fechaNac.replace(/-/g, '');
+        let hash = 0;
+        for (let i = 0; i < base.length; i++) {
+            hash = ((hash << 5) - hash) + base.charCodeAt(i);
+            hash = hash & hash;
+        }
+        const homoclave = String(Math.abs(hash) % 100).padStart(2, '0');
+
+        return letra1 + letra2 + letra3 + letra4 + anio + mes + dia + sexo + estado + cons1 + cons2 + cons3 + homoclave;
+    }
+
+    function actualizarCURP() {
+        const curp = generarCURP();
+        if (curp && curp.length === 18) {
+            curpInput.value = curp;
+        }
+    }
+
+    nombreInput.addEventListener('input', actualizarCURP);
+    fechaInput.addEventListener('input', actualizarCURP);
+    generoSelect.addEventListener('change', actualizarCURP);
+
+    // Generar al cargar si ya hay datos
+    actualizarCURP();
+});
+</script>
+{% endif %}
 {% endblock %}

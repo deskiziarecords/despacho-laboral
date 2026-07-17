@@ -27,9 +27,9 @@ class SolicitudTransferenciaAdmin(admin.ModelAdmin):
 
 @admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
-    list_display = ['nombre', 'curp', 'telefono', 'email', 'empresa', 'created_at']
-    search_fields = ['nombre', 'curp', 'rfc', 'telefono', 'email']
-    list_filter = ['empresa', 'created_at']
+    list_display = ['nombre', 'curp', 'telefono', 'email', 'empresa', 'como_supo', 'oficina', 'created_at']
+    search_fields = ['nombre', 'curp', 'rfc', 'telefono', 'email', 'como_supo', 'oficina']
+    list_filter = ['empresa', 'como_supo', 'oficina', 'created_at']
     date_hierarchy = 'created_at'
 
 
