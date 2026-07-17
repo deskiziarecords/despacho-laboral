@@ -296,6 +296,101 @@ def _detectar_errores_validacion(page):
         return []
 
 
+def _truncar(texto, max_len=50):
+    """Trunca un string al máximo de caracteres permitido."""
+    return (texto or '')[:max_len]
+
+
+# ─── Helpers para generar CURP sintética (cuando no hay CURP real) ─────
+
+CONSONANTES_CURP = 'BCDFGHJKLMNPQRSTVWXYZ'
+VOCALES = 'AEIOU'
+
+
+def _normalizar_curp(s):
+    """Normaliza un string para CURP: mayúsculas, sin acentos, Ñ se queda."""
+    if not s:
+        return ''
+    s = s.upper().strip()
+    s = s.replace('\u00c1', 'A').replace('\u00c9', 'E').replace('\u00cd', 'I')
+    s = s.replace('\u00d3', 'O').replace('\u00da', 'U')
+    return s
+
+
+def _primera_letra(s):
+    s = s.strip()
+    return s[0] if s else 'X'
+
+
+def _vocal_interna(s):
+    for c in s[1:]:
+        if c in VOCALES:
+            return c
+    return 'X'
+
+
+def _consonante_interna(s):
+    for c in s[1:]:
+        if c in CONSONANTES_CURP:
+            return c
+    return 'X'
+
+
+def _generar_curp(nombre='', apellido1='', apellido2='', fecha_nac=None, genero='masculino'):
+    """
+    Genera una CURP sintética en formato válido a partir de los datos del cliente.
+    Se usa como fallback cuando el cliente no tiene CURP registrada.
+    """
+    import hashlib as _hashlib
+    from datetime import date as _date
+
+    nombre = _normalizar_curp(nombre or '')
+    apellido1 = _normalizar_curp(apellido1 or '')
+    apellido2 = _normalizar_curp(apellido2 or '')
+
+    if not apellido2:
+        apellido2 = 'X'
+
+    nombres_lista = nombre.split()
+    primer_nombre = nombres_lista[0] if nombres_lista else ''
+
+    # 4 letras: apellido paterno, vocal interna, apellido materno, primer nombre
+    letra1 = _primera_letra(apellido1)
+    letra2 = _vocal_interna(apellido1)
+    letra3 = _primera_letra(apellido2)
+    letra4 = _primera_letra(primer_nombre)
+
+    # Fecha de nacimiento (YYMMDD)
+    if fecha_nac is None:
+        fecha_nac = _date(1990, 1, 1)
+    if isinstance(fecha_nac, str):
+        try:
+            from datetime import datetime as _dt
+            fecha_nac = _dt.strptime(fecha_nac, '%d/%m/%Y').date()
+        except Exception:
+            fecha_nac = _date(1990, 1, 1)
+    fecha_str = fecha_nac.strftime('%y%m%d')
+
+    # Género: H/M
+    gen = 'H' if (genero or '').lower().rstrip('o') in ('masculin', 'h', 'hombre') else 'M'
+
+    # Entidad federativa: BC = Baja California
+    estado = 'BC'
+
+    # Primeras consonantes internas
+    cons1 = _consonante_interna(apellido1)
+    cons2 = _consonante_interna(apellido2)
+    cons3 = _consonante_interna(primer_nombre)
+
+    # Homoclave de 2 dígitos basada en hash de los campos
+    base = f'{letra1}{letra2}{letra3}{letra4}{fecha_str}{gen}{estado}{cons1}{cons2}{cons3}'
+    hash_val = int(_hashlib.md5(base.encode()).hexdigest()[:8], 16)
+    homoclave = f'{hash_val % 100:02d}'
+
+    curp = f'{letra1}{letra2}{letra3}{letra4}{fecha_str}{gen}{estado}{cons1}{cons2}{cons3}{homoclave}'
+    return curp[:18].ljust(18, '0')
+
+
 def _extraer_folio_desde_pdf(pdf_path, nombre_pdf=''):
     """
     Extrae el folio del nombre del archivo PDF o de su contenido.
@@ -433,13 +528,23 @@ def _llenar_domicilio(page, vialidad, num_ext, cp, prefix='domicilio'):
 def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_str):
     """Llena los campos del solicitante (trabajador)."""
     nombre_parts = (cliente.nombre or '').split()
-    curp = cliente.curp or 'XAXX010101000'
 
-    # Datos personales
+    # CURP: usar la real del cliente, o generar una sintética válida
+    curp = cliente.curp
+    if not curp:
+        curp = _generar_curp(
+            nombre=cliente.nombre,
+            apellido1=nombre_parts[1] if len(nombre_parts) > 1 else 'Perez',
+            apellido2=nombre_parts[2] if len(nombre_parts) > 2 else 'Lopez',
+            fecha_nac=cliente.fecha_nacimiento,
+            genero=cliente.genero,
+        )
+
+    # Datos personales (truncados a 50 chars cada uno para evitar errores del portal)
     _fill_input(page, 'solicitante[curp]', curp)
-    _fill_input(page, 'solicitante[nombre]', nombre_parts[0] if nombre_parts else 'Juan')
-    _fill_input(page, 'solicitante[primer_apellido]', nombre_parts[1] if len(nombre_parts) > 1 else 'Perez')
-    _fill_input(page, 'solicitante[segundo_apellido]', nombre_parts[2] if len(nombre_parts) > 2 else 'Lopez')
+    _fill_input(page, 'solicitante[nombre]', _truncar(nombre_parts[0] if nombre_parts else 'Juan', 50))
+    _fill_input(page, 'solicitante[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'Perez', 50))
+    _fill_input(page, 'solicitante[segundo_apellido]', _truncar(nombre_parts[2] if len(nombre_parts) > 2 else 'Lopez', 50))
     _fill_input(page, 'solicitante[fecha_nacimiento]', fecha_nac_str)
 
     # Género y nacionalidad
@@ -485,11 +590,11 @@ def _llenar_citado(page, cliente):
     _click_radio(page, 'solicitado[tipo_persona_id]', tipo_persona_id)
     page.wait_for_timeout(300)
 
-    # Datos del citado
-    _fill_input(page, 'solicitado[nombre]', nombre_parts[0] if nombre_parts else 'Empresa')
-    _fill_input(page, 'solicitado[primer_apellido]', nombre_parts[1] if len(nombre_parts) > 1 else 'SA')
+    # Datos del citado (truncados a 50 chars para evitar errores del portal)
+    _fill_input(page, 'solicitado[nombre]', _truncar(nombre_parts[0] if nombre_parts else 'Empresa', 50))
+    _fill_input(page, 'solicitado[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'SA', 50))
     _fill_input(page, 'solicitado[segundo_apellido]',
-                'de CV' if len(nombre_parts) <= 2 else ' '.join(nombre_parts[2:]))
+                _truncar('de CV' if len(nombre_parts) <= 2 else ' '.join(nombre_parts[2:]), 50))
     _select_option(page, 'solicitado[genero_id]', '1')             # MASCULINO
     _select_option(page, 'solicitado[nacionalidad_id]', '1')       # MEXICANA
 
