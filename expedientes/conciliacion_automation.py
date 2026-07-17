@@ -366,10 +366,41 @@ def _consonante_interna(s):
     return 'X'
 
 
+def _calcular_digito_verificador(curp17):
+    """
+    Calcula el dígito verificador (18vo carácter) de una CURP de 17 caracteres.
+    
+    Algoritmo oficial SAT/RENAPO:
+    1. Cada carácter se mapea a valor 0-9 (dígitos) o 10-36 (letras A-Z con Ñ=0)
+    2. Se toma solo la última cifra de cada valor (módulo 10)
+    3. Se multiplica por el peso de la posición (posición 1 tiene peso 17, ... posición 17 tiene peso 1)
+    4. Suma total módulo 10 → residuo
+    5. Si residuo = 0 → dígito = 0, sino → dígito = 10 - residuo
+    """
+    mapa = {
+        '0':0,'1':1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,
+        'A':10,'B':11,'C':12,'D':13,'E':14,'F':15,'G':16,'H':17,
+        'I':18,'J':19,'K':20,'L':21,'M':22,'N':23,'Ñ':0,'O':25,
+        'P':26,'Q':27,'R':28,'S':29,'T':30,'U':31,'V':32,'W':33,
+        'X':34,'Y':35,'Z':36,
+    }
+    suma = 0
+    for i, c in enumerate(curp17.upper()):
+        digito = (mapa.get(c, 0) % 10)
+        peso = 17 - i  # posición 1 → peso 17, posición 17 → peso 1
+        suma += digito * peso
+    residuo = suma % 10
+    return str(0 if residuo == 0 else 10 - residuo)
+
+
 def _generar_curp(nombre='', apellido1='', apellido2='', fecha_nac=None, genero='masculino'):
     """
-    Genera una CURP sintética en formato válido a partir de los datos del cliente.
-    Se usa como fallback cuando el cliente no tiene CURP registrada.
+    Genera una CURP sintética con dígito verificador válido.
+    
+    La CURP pasa validación de FORMATO y DÍGITO VERIFICADOR,
+    pero NO corresponde a una persona real (no está en RENAPO).
+    Muchos portales gubernamentales solo verifican formato y dígito,
+    no hacen consulta en vivo contra RENAPO.
     """
     import hashlib as _hashlib
     from datetime import date as _date
@@ -412,13 +443,21 @@ def _generar_curp(nombre='', apellido1='', apellido2='', fecha_nac=None, genero=
     cons2 = _consonante_interna(apellido2)
     cons3 = _consonante_interna(primer_nombre)
 
-    # Homoclave de 2 dígitos basada en hash de los campos
-    base = f'{letra1}{letra2}{letra3}{letra4}{fecha_str}{gen}{estado}{cons1}{cons2}{cons3}'
-    hash_val = int(_hashlib.md5(base.encode()).hexdigest()[:8], 16)
-    homoclave = f'{hash_val % 100:02d}'
-
-    curp = f'{letra1}{letra2}{letra3}{letra4}{fecha_str}{gen}{estado}{cons1}{cons2}{cons3}{homoclave}'
-    return curp[:18].ljust(18, '0')
+    # Construir CURP de 17 caracteres (sin dígito verificador)
+    curp17 = f'{letra1}{letra2}{letra3}{letra4}{fecha_str}{gen}{estado}{cons1}{cons2}{cons3}'
+    
+    # Generar homoclave (posición 17) basada en hash
+    hash_val = int(_hashlib.md5(curp17.encode()).hexdigest()[:8], 16)
+    # Alternar entre letra y dígito para la homoclave
+    if hash_val % 2 == 0:
+        homoclave = chr(ord('A') + (hash_val % 26))  # Letra A-Z
+    else:
+        homoclave = str(hash_val % 10)  # Dígito 0-9
+    
+    # Calcular dígito verificador (posición 18)
+    dv = _calcular_digito_verificador(curp17 + homoclave)
+    
+    return curp17 + homoclave + dv
 
 
 def _extraer_folio_desde_pdf(pdf_path, nombre_pdf=''):
