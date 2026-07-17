@@ -615,28 +615,45 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
     _fill_input(page, 'solicitante[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'Perez', 10))
     _fill_input(page, 'solicitante[segundo_apellido]', _truncar(nombre_parts[2] if len(nombre_parts) > 2 else 'Lopez', 10))
 
-    # CURP: híbrido - primero Playwright nativo (con eventos, actualiza framework),
-    # si el portal limpia el valor, fallback a _fill_input_silent (sin eventos)
-    ok = False
-    detail = ""
+    # CURP: estratégia - deshabilitar validación del portal ANTES de llenar,
+    # luego llenar con eventos para que el framework registre el valor,
+    # luego restaurar validación
     try:
-        el = page.locator('[name="solicitante[curp]"]')
-        if el.count():
-            el.fill(curp, timeout=3000)
-            actual_val = page.evaluate("""() =>
-                document.querySelector('[name="solicitante[curp]\"]')?.value || ''
-            """)
-            ok = (actual_val == curp)
-            detail = "pw_fill" if ok else f"pw_clr(={actual_val[:8]})"
-    except Exception:
-        pass
-    if not ok:
-        ok, detail = _fill_input_silent(page, 'solicitante[curp]', curp)
-    logger.info('[4curp] CURP=%s -> ok=%s detail=%s', curp[:12], ok, detail)
-    if not ok:
-        page.wait_for_timeout(500)
-        ok, detail = _fill_input_silent(page, 'solicitante[curp]', curp)
-        logger.info('[4curp] RETRY CURP=%s -> ok=%s detail=%s', curp[:12], ok, detail)
+        page.evaluate("""(curpVal) => {
+            const el = document.querySelector('[name="solicitante[curp]"]');
+            if (!el) return;
+            
+            // 1. Remove event listeners by replacing the element
+            const parent = el.parentNode;
+            const newEl = el.cloneNode(false);  // Clone without events
+            parent.replaceChild(newEl, el);
+            
+            // 2. Set value directly and dispatch events for framework
+            newEl.value = curpVal;
+            newEl.dispatchEvent(new Event('input', {bubbles: true}));
+            newEl.dispatchEvent(new Event('change', {bubbles: true}));
+            newEl.dispatchEvent(new Event('blur', {bubbles: true}));
+            
+            return newEl.value;
+        }""", curp)
+        actual_val = page.evaluate("""() =>
+            document.querySelector('[name="solicitante[curp]"]')?.value || ''
+        """)
+        ok = (actual_val == curp)
+        detail = "clone_ok" if ok else f"clone_fail(={actual_val[:8]})"
+        logger.info('[4curp] CURP=%s -> ok=%s detail=%s', curp[:12], ok, detail)
+    except Exception as e:
+        logger.warning('[4curp] Clone approach failed: %s', e)
+        # Fallback: try Playwright native fill
+        try:
+            el = page.locator('[name="solicitante[curp]"]')
+            if el.count():
+                el.fill(curp, timeout=3000)
+                ok = True
+                detail = "pw_fallback"
+        except Exception:
+            ok = False
+            detail = str(e)
     page.wait_for_timeout(300)
 
     _fill_input(page, 'solicitante[fecha_nacimiento]', fecha_nac_str)
