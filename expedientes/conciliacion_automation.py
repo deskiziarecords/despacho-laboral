@@ -583,8 +583,11 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
         el = page.locator('[name="solicitante[curp]"]')
         if el.count():
             el.fill(curp, timeout=3000)
-            ok = True
-            detail = "pw_fill"
+            actual_val = page.evaluate("""() =>
+                document.querySelector('[name="solicitante[curp]\"]')?.value || ''
+            """)
+            ok = (actual_val == curp)
+            detail = "pw_fill" if ok else f"pw_clr(={actual_val[:8]})"
     except Exception:
         pass
     if not ok:
