@@ -502,6 +502,7 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
     fmt_fecha = lambda f: f.strftime('%d/%m/%Y')
 
     pdf_descargado = None
+    url_final = ''
 
     try:
         with sync_playwright() as p:
@@ -914,28 +915,43 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             logger.info('[8] Extrayendo folio y descargando acuse...')
 
             # ── 8a: Extraer folio del texto de la página de confirmación ──
-            # La página en /solicitud/update muestra el folio prominentemente.
-            # Intentamos antes de cualquier click para no perder el contexto.
             texto_pagina = ''
+            url_actual = ''
+
+            # Patrones de folio (definidos ANTES del try para que estén disponibles
+            # en Phase 8d incluso si Phase 8a falla)
+            FOLIO_PATTERNS = [
+                r'[Ff]olio[:\s#Nº°\.]*([A-Z0-9][-A-Z0-9/]+)',
+                r'N[úu]mero\s+de\s+[Ss]olicitud[:\s]*([A-Z0-9][-A-Z0-9/]+)',
+                r'N[úu]mero\s+de\s+[Ff]olio[:\s]*([A-Z0-9][-A-Z0-9/]+)',
+                r'[Ss]olicitud\s+N[°º]?[:\s]*([A-Z0-9][-A-Z0-9/]+)',
+                r'Expediente[:\s#]*([A-Z0-9][-A-Z0-9/]+)',
+                r'[Ff]olio[:\s#Nº°\.]*([\w\-]+\d[\w\-]*)',
+                r'[Ff]olio[:\s#Nº°\.]*(\d{2,}[-/]?\d{2,})',
+                r'(CCL[-/][A-Z0-9/-]+)',
+                r'(BCN?[-/][A-Z0-9/-]+)',
+                r'(CFFL[-/][A-Z0-9/-]+)',
+                r'(BC[-/]CCFL[-/][A-Z0-9/-]+)',
+                r'/(solicitud|update|folio)/([A-Z0-9][-A-Z0-9/]+)',
+                r'(\d{4}[-/]\d{4,8})',
+                r'\b(\d{4}[-/]\d{4,8})\b',
+                r'\b(CCL[\s-]?\d{3,8})\b',
+                r'\b(CCL[\s-]?\d{4}[-/]\d{3,8})\b',
+            ]
+
             try:
                 texto_pagina = page.inner_text('body')
                 logger.info('[8] Texto de página de confirmación: %s...', texto_pagina[:600].replace('\n', ' | '))
 
-                FOLIO_PATTERNS = [
-                    # Etiqueta explícita seguida de folio
-                    r'[Ff]olio[:\s#Nº°\.]*([A-Z0-9][-A-Z0-9/]+)',
-                    r'N[úu]mero\s+de\s+[Ss]olicitud[:\s]*([A-Z0-9][-A-Z0-9/]+)',
-                    r'N[úu]mero\s+de\s+[Ff]olio[:\s]*([A-Z0-9][-A-Z0-9/]+)',
-                    r'[Ss]olicitud\s+N[°º]?[:\s]*([A-Z0-9][-A-Z0-9/]+)',
-                    r'Expediente[:\s#]*([A-Z0-9][-A-Z0-9/]+)',
-                    # Formatos típicos del portal BC
-                    r'(CCL[-/][A-Z0-9/-]+)',
-                    r'(BCN?[-/][A-Z0-9/-]+)',
-                    r'(CFFL[-/][A-Z0-9/-]+)',
-                    r'(BC[-/]CCFL[-/][A-Z0-9/-]+)',
-                    # Número de 4 dígitos (año) guion número
-                    r'\b(\d{4}[-/]\d{4,8})\b',
-                ]
+                # También extraer la URL actual (el folio puede estar en la URL)
+                try:
+                    url_actual = page.url
+                    url_final = url_actual
+                    logger.info('[8] URL actual de confirmación: %s', url_actual)
+                except Exception:
+                    url_actual = ''
+
+                # Intentar en texto de página primero
                 for pat in FOLIO_PATTERNS:
                     m = re.search(pat, texto_pagina)
                     if m:
@@ -945,18 +961,52 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                         resultado.success = True
                         break
 
+                # Si no se encontró en texto, intentar en la URL
+                if not resultado.folio and url_actual:
+                    for pat in FOLIO_PATTERNS:
+                        m = re.search(pat, url_actual)
+                        if m:
+                            folio_candidato = (m.group(1) if m.lastindex else m.group(0)).strip()
+                            logger.info('[8] Folio encontrado en URL con patrón "%s": %s', pat, folio_candidato)
+                            resultado.folio = folio_candidato
+                            resultado.success = True
+                            break
+
                 if not resultado.folio:
-                    logger.warning('[8] No se encontró folio en el texto de la página')
-                    logger.info('[8] Texto completo para diagnóstico: %s', texto_pagina[:1500])
+                    logger.warning('[8] No se encontró folio en el texto de la página ni en la URL')
+                    logger.info('[8] Texto completo para diagnóstico: %s...', texto_pagina[:2000])
             except Exception as e:
                 logger.warning('[8] Error al extraer texto de página: %s', e)
 
             # ── 8b: Intentar descargar el PDF del acuse ───────────────────
-            # Probamos múltiples textos de botón que el portal podría usar
+            # Intentar con botones primero
             for texto_btn in ['acuse', 'descargar', 'pdf', 'comprobante', 'recibo',
                               'imprimir', 'constancia', 'documento']:
                 _btn_click(page, texto_btn)
                 page.wait_for_timeout(600)
+
+            # También intentar con links directos que apunten a archivos o descarga
+            try:
+                link_encontrado = page.evaluate("""() => {
+                    const keywords = ['acuse', 'descargar', 'pdf', 'folio', 'comprobante',
+                                      'recibo', 'imprimir', 'constancia', 'documento',
+                                      'getFile', 'generaDocumento'];
+                    for (const a of document.querySelectorAll('a')) {
+                        const href = (a.href || '').toLowerCase();
+                        const text = (a.textContent || '').toLowerCase().trim();
+                        if (keywords.some(k => href.includes(k) || text.includes(k)) && a.offsetParent !== null) {
+                            a.click();
+                            a.dispatchEvent(new Event('click', {bubbles: true}));
+                            return a.href;
+                        }
+                    }
+                    return null;
+                }""")
+                if link_encontrado:
+                    logger.info('[8b] Click en link: %s', link_encontrado)
+                    page.wait_for_timeout(1500)
+            except Exception:
+                pass
 
             # Esperar a que la descarga termine
             try:
@@ -1011,7 +1061,11 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                 doc_url = ''
                 try:
                     doc_url = page.evaluate("""() => {
-                        const sel = 'a[href*="getFile"], a[href*="acuse"], a[href*="documento"], a[href*="folio"], a[href*=".pdf"]';
+                        const keywords = ['getFile', 'acuse', 'documento', 'folio', '.pdf',
+                                           'descargar', 'generaDocumento', 'firma'];
+                        const sel = 'a[href*="getFile"], a[href*="acuse"], a[href*="documento"], ' +
+                                    'a[href*="folio"], a[href*=".pdf"], a[href*="descargar"], ' +
+                                    'a[href*="generaDocumento"], a[href*="firma"]';
                         for (const link of document.querySelectorAll(sel)) {
                             if (link.href) return link.href;
                         }
@@ -1037,17 +1091,36 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                         try:
                             page.goto(doc_url, wait_until='networkidle', timeout=15000)
                             page.wait_for_timeout(2000)
-                            # Si hay un botón de descarga, clickearlo
-                            for txt in ['descargar', 'acuse', 'pdf', 'guardar']:
+
+                            # Intentar extraer folio de la página de documento
+                            try:
+                                doc_texto = page.inner_text('body')
+                                logger.info('[8d] Texto de página documento: %s...', doc_texto[:500].replace('\n', ' | '))
+                                # Buscar folio en esta página
+                                for pat in FOLIO_PATTERNS:
+                                    m = re.search(pat, doc_texto)
+                                    if m:
+                                        folio_candidato = (m.group(1) if m.lastindex else m.group(0)).strip().rstrip('.')
+                                        logger.info('[8d] Folio encontrado en doc_url con patrón "%s": %s', pat, folio_candidato)
+                                        resultado.folio = folio_candidato
+                                        resultado.success = True
+                                        break
+                            except Exception:
+                                pass
+
+                            # Si no se encontró folio aún, buscar botón de descarga
+                            for txt in ['descargar', 'acuse', 'pdf', 'guardar', 'imprimir', 'recibo', 'comprobante']:
                                 if _btn_click(page, txt):
                                     page.wait_for_timeout(1000)
                                     break
+
                             # Esperar posible descarga
                             try:
                                 page.wait_for_load_state('networkidle', timeout=8000)
                             except Exception:
                                 pass
-                            page.wait_for_timeout(2000)
+                            # Dar tiempo adicional para que la descarga comience
+                            page.wait_for_timeout(3000)
                             checkpoint('08_pdf_navegado')
                         except Exception as nav_err:
                             logger.warning('[8d] Error navegando a doc_url: %s', nav_err)
@@ -1063,19 +1136,39 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                                 resultado.success = True
                                 resultado.detalle = f'Solicitud enviada. Folio: {resultado.folio}'
                                 logger.info('[8d] Éxito con PDF. Folio=%s', resultado.folio)
+
+                    # Si después de todo no se encontró folio, guardar diagnóstico
+                    if not resultado.folio:
+                        resultado.error = 'Solicitud enviada al portal pero no se pudo obtener el folio'
+                        try:
+                            url_final = page.url
+                        except Exception:
+                            url_final = doc_url
+                        resultado.detalle = (
+                            f'URL_FINAL={url_final} | '
+                            f'URL_DOC={doc_url} | '
+                            f'TEXTO={texto_pagina[:1000]}'
+                        )
                 else:
                     resultado.error = 'Solicitud enviada al portal pero no se pudo obtener el folio'
                     try:
                         url_final = page.url
                     except Exception:
                         url_final = 'desconocida'
-                    resultado.detalle = f'URL={url_final} | TEXTO={texto_pagina[:800]}'
+                    screenshot('08_error_no_folio')
+                    resultado.detalle = (
+                        f'URL={url_final} | '
+                        f'TEXTO={texto_pagina[:1000]}'
+                    )
 
             browser.close()
 
     except Exception as e:
         logger.exception('Error en la automatización de conciliación')
         resultado.error = f'{type(e).__name__}: {e}'
+        # Guardar URL para diagnóstico
+        if not resultado.detalle and url_final:
+            resultado.detalle = f'URL={url_final} | EXCEPTION={e}'
 
     return resultado
 
