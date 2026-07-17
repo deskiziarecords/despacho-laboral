@@ -610,10 +610,10 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
             genero=cliente.genero,
         )
 
-    # Datos personales (truncados MUY agresivamente para respetar límites del portal)
-    _fill_input(page, 'solicitante[nombre]', _truncar(nombre_parts[0] if nombre_parts else 'Juan', 5))
-    _fill_input(page, 'solicitante[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'Perez', 5))
-    _fill_input(page, 'solicitante[segundo_apellido]', _truncar(nombre_parts[2] if len(nombre_parts) > 2 else 'Lopez', 5))
+    # Datos personales (truncados para respetar límites del portal)
+    _fill_input(page, 'solicitante[nombre]', _truncar(nombre_parts[0] if nombre_parts else 'Juan', 15))
+    _fill_input(page, 'solicitante[primer_apellido]', _truncar(nombre_parts[1] if len(nombre_parts) > 1 else 'Perez', 15))
+    _fill_input(page, 'solicitante[segundo_apellido]', _truncar(nombre_parts[2] if len(nombre_parts) > 2 else 'Lopez', 15))
 
     # CURP: usar nativeSetter para evitar que la validación del portal borre
     # el valor. El native setter (HTMLInputElement.prototype.value) actualiza

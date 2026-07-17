@@ -38,38 +38,10 @@ def run():
             sys.exit(1)
         log("    ✅ Logged in")
 
-        # ── STEP 2: Find an expediente with CURP + telefono ───────────────
-        log(f"\n[2] Looking for expedientes list...")
-        page.goto(f"{BASE}/expedientes/", timeout=20000)
-        page.wait_for_load_state("networkidle", timeout=15000)
-
-        # Get first expediente link
-        links = page.locator("table tbody tr a, .expediente-link, a[href*='/expedientes/']").all()
-        expediente_url = None
-        for link in links:
-            href = link.get_attribute("href") or ""
-            if "/expedientes/" in href and href.rstrip("/").split("/")[-1].isdigit():
-                expediente_url = href if href.startswith("http") else BASE + href
-                break
-
-        if not expediente_url:
-            # Try finding any link with a number pattern like /expedientes/123/
-            import re
-            hrefs = page.eval_on_selector_all(
-                "a", "els => els.map(e => e.href)"
-            )
-            for h in hrefs:
-                if re.search(r"/expedientes/\d+/?$", h):
-                    expediente_url = h
-                    break
-
-        if not expediente_url:
-            log("ERROR: Could not find any expediente link on the list page")
-            log(f"  Page text: {page.inner_text('body')[:500]}")
-            browser.close()
-            sys.exit(1)
-
-        log(f"    → Found expediente: {expediente_url}")
+        # ── STEP 2: Use expediente #2 (BC-state CURP, short name) ────────
+        EXPEDIENTE_PK = 2
+        expediente_url = f"{BASE}/expedientes/{EXPEDIENTE_PK}/"
+        log(f"\n[2] Using expediente #{EXPEDIENTE_PK}: {expediente_url}")
 
         # ── STEP 3: Open expediente detail and check CURP/telefono ─────────
         log(f"\n[3] Opening expediente detail...")
