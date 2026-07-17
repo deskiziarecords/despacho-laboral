@@ -610,6 +610,10 @@ def _llenar_solicitante(page, cliente, fecha_nac_str, fecha_ing_str, fecha_sal_s
     # CURP: usar _fill_input_robust con verificación y reintento
     ok, detail = _fill_input_robust(page, 'solicitante[curp]', curp)
     logger.info('[4curp] CURP=%s -> ok=%s detail=%s', curp[:12], ok, detail)
+    if not ok:
+        page.wait_for_timeout(500)
+        ok, detail = _fill_input_robust(page, 'solicitante[curp]', curp)
+        logger.info('[4curp] RETRY CURP=%s -> ok=%s detail=%s', curp[:12], ok, detail)
     page.wait_for_timeout(300)
 
     _fill_input(page, 'solicitante[fecha_nacimiento]', fecha_nac_str)
