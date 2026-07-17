@@ -254,6 +254,48 @@ def _click_validar_continuar(page):
         return False
 
 
+def _detectar_errores_validacion(page):
+    """
+    Detecta errores de validación en la página del portal.
+    Retorna lista de mensajes de error, o lista vacía si no hay.
+    """
+    try:
+        errores = page.evaluate("""() => {
+            const errs = [];
+            // Buscar en clases de error comunes
+            const selectors = '.text-danger, .error, .invalid-feedback, .help-block, ' +
+                              '.is-invalid, .alert-danger, [class*="error"]';
+            document.querySelectorAll(selectors).forEach(el => {
+                const txt = el.textContent.trim();
+                if (txt && txt.length > 2) {
+                    let input = el.closest('[class*="col"], div, .form-group')?.querySelector(
+                        'input, select, textarea'
+                    );
+                    errs.push({ msg: txt.substring(0, 80), name: input?.name || input?.id || '' });
+                }
+            });
+            // También buscar patrones de texto específicos que indiquen errores
+            const body = document.body.innerText || '';
+            const patterns = [
+                'no es válida', 'Completa este campo', 'Este campo es obligatorio',
+                'campo requerido', 'inválido', 'debe ser', 'no coincide',
+                'seleccione una opción'
+            ];
+            for (const p of patterns) {
+                if (body.toLowerCase().includes(p.toLowerCase())) {
+                    // Solo agregar si no se encontró ya en elementos con clase
+                    if (!errs.some(e => e.msg.toLowerCase().includes(p.toLowerCase()))) {
+                        errs.push({ msg: p, name: 'patron' });
+                    }
+                }
+            }
+            return errs;
+        }""")
+        return errores or []
+    except Exception:
+        return []
+
+
 def _extraer_folio_desde_pdf(pdf_path, nombre_pdf=''):
     """
     Extrae el folio del nombre del archivo PDF o de su contenido.
@@ -507,8 +549,6 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
     try:
         with sync_playwright() as p:
             # ── En producción (Railway/Docker) siempre forzar headless ──
-            # El modo "debug" (headless=False) requiere un servidor X,
-            # que no está disponible en contenedores Docker.
             force_headless = os.environ.get('FORCE_HEADLESS', 'true').lower() == 'true'
             actual_headless = headless if not force_headless else True
 
@@ -611,14 +651,12 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             # Llenar fecha de conflicto y cerrar el date-picker que se abre
             _fill_input(page, 'solicitud[fecha_conflicto]', fmt_fecha(fecha_conflicto))
-            # Escape cierra el calendario sin borrar el valor ya seteado
             try:
                 page.keyboard.press('Escape')
             except Exception:
                 pass
             page.wait_for_timeout(400)
 
-            # Diagnóstico: listar todos los selects en la página para confirmar nombres
             try:
                 selects_info = page.evaluate("""() =>
                     Array.from(document.querySelectorAll('select')).map(s => ({
@@ -631,14 +669,10 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             except Exception:
                 pass
 
-            # Seleccionar objeto — usar selectedIndex=1 porque el valor numérico
-            # varía por portal y setting el.value a un ID incorrecto falla silenciosamente
             try:
                 objeto_texto = page.evaluate("""() => {
-                    // Intentar el nombre conocido primero, luego buscar por heurística
                     let sel = document.querySelector('[name="solicitud[objeto_id]"]');
                     if (!sel) {
-                        // Buscar el segundo select de la página (el primero podría ser otro)
                         const allSels = document.querySelectorAll('select');
                         for (const s of allSels) {
                             if (s.name && s.name.toLowerCase().includes('objeto')) {
@@ -658,7 +692,6 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                 logger.warning('[3] Error al seleccionar objeto: %s', e)
             page.wait_for_timeout(300)
 
-            # Click "Validar y Continuar"
             _click_validar_continuar(page)
             page.wait_for_timeout(1000)
             checkpoint('03_fecha_objeto')
@@ -668,15 +701,12 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             # ════════════════════════════════════════════════════════════════
             logger.info('[4] Llenando datos del solicitante...')
 
-            # Navegar al tab "Solicitante"
             _navigate_wizard_tab(page, 'solicitante')
             page.wait_for_timeout(800)
 
-            # Click "Agregar solicitante"
             _btn_click(page, 'agregar solicitante')
             page.wait_for_timeout(1500)
 
-            # Llenar campos del solicitante
             _llenar_solicitante(page, cliente,
                                 fmt_fecha(fecha_nac),
                                 fmt_fecha(fecha_ing),
@@ -684,7 +714,6 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             page.wait_for_timeout(1000)
             checkpoint('04_solicitante')
 
-            # Click "Validar y Continuar"
             _click_validar_continuar(page)
             page.wait_for_timeout(1000)
             checkpoint('04_solicitante_validado')
@@ -694,23 +723,18 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             # ════════════════════════════════════════════════════════════════
             logger.info('[5] Llenando datos del citado...')
 
-            # Navegar al tab "Citado"
             _navigate_wizard_tab(page, 'citado')
             page.wait_for_timeout(800)
 
-            # Click "Agregar citado"
             _btn_click(page, 'agregar citado')
             page.wait_for_timeout(1500)
 
-            # Llenar campos del citado
             _llenar_citado(page, cliente)
             page.wait_for_timeout(1000)
             checkpoint('05_citado')
 
-            # Click "Validar y Continuar"
             _click_validar_continuar(page)
             page.wait_for_timeout(1500)
-            # Wait for any portal-side navigation triggered by Validar y Continuar
             try:
                 page.wait_for_load_state('domcontentloaded', timeout=5000)
             except Exception:
@@ -722,11 +746,9 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             # ════════════════════════════════════════════════════════════════
             logger.info('[6] Llenando descripción de los hechos...')
 
-            # Navegar al tab "Descripción"
             _navigate_wizard_tab(page, 'descripci')
             page.wait_for_timeout(800)
 
-            # Construir texto de descripción
             hechos = [
                 f'El día {fmt_fecha(fecha_conflicto)} fui despedido injustificadamente'
             ]
@@ -744,10 +766,7 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             texto_hechos = ' '.join(hechos)
 
-            # Cerrar cualquier modal/SweetAlert que esté bloqueando
             _cerrar_modales(page)
-
-            # Llenar textarea con JS (evita interceptación de SweetAlert/modales)
             try:
                 page.evaluate("""(texto) => {
                     const ta = document.querySelector('textarea');
@@ -761,8 +780,6 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             except Exception:
                 pass
             page.wait_for_timeout(300)
-
-            # Click "Aceptar"
             _btn_click(page, 'aceptar')
             page.wait_for_timeout(1000)
             checkpoint('06_descripcion')
@@ -772,7 +789,6 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             # ════════════════════════════════════════════════════════════════
             logger.info('[7] Navegando a resumen y enviando...')
 
-            # Navegar al tab "Resumen"
             _navigate_wizard_tab(page, 'resumen')
             page.wait_for_timeout(1000)
 
@@ -799,43 +815,13 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             # ════════════════════════════════════════════════════════════
             #  FASE 7: Envío de la solicitud con manejo de navegación
             # ════════════════════════════════════════════════════════════
-            #
-            # PROBLEMA: El portal navega a una nueva página al enviar
-            # el formulario (ya sea al hacer clic en "Enviar solicitud"
-            # o al confirmar con "Enviar"). La navegación DESTRUYE el
-            # contexto de JS anterior, causando el error:
-            #   "Execution context was destroyed"
-            #
-            # SOLUCIÓN: Usar expect_navigation() para:
-            #  1. Crear un watcher de navegación ANTES de cualquier clic
-            #  2. Hacer los clicks que disparan la navegación
-            #  3. Esperar a que la navegación termine completamente
-            #
-            # El watcher cubre AMBOS clicks porque no sabemos cuál
-            # de ellos dispara la navegación (puede variar según el
-            # comportamiento actual del portal).
-            # ════════════════════════════════════════════════════════════
-            # ════════════════════════════════════════════════════════════
-            #  FASE 7: Envío con expect_navigation + SweetAlert selector
-            # ════════════════════════════════════════════════════════════
-            #
-            # ESTRATEGIA:
-            #  1. expect_navigation() se activa ANTES de cualquier clic
-            #  2. Se espera el SweetAlert específicamente (no timeout ciego)
-            #  3. Se usa SOLO Playwright nativo para el clic (no evaluate)
-            #  4. Si no hay SweetAlert, se asume que ya navegó
-            #  5. Se detecta navegación comparando URLs
-            # ════════════════════════════════════════════════════════════
             logger.info('[7] Iniciando envío con expect_navigation...')
             navegacion_completa = False
             url_inicial = page.url
 
-            # 7a: Click "Enviar solicitud" - FUERA del expect_navigation
-            # porque puede o no disparar navegación (SweetAlert puede aparecer antes)
             logger.info('[7a] Click en Enviar solicitud...')
             _btn_click(page, 'enviar solicitud')
 
-            # Esperar SweetAlert por máximo 1.5s (si no aparece, el envío es directo)
             try:
                 page.wait_for_selector('.swal-overlay, .swal-modal, .modal.show', timeout=1500)
                 logger.info('[7a] SweetAlert detectado')
@@ -845,10 +831,6 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             try:
                 with page.expect_navigation(timeout=45000):
-                    # 7b: Click botón de confirmación del SweetAlert (si apareció)
-                    # Usar selector específico de SweetAlert para evitar clickear
-                    # "Enviar solicitud" del fondo de la página por error
-                    logger.info('[7b] Click en confirmar SweetAlert...')
                     confirmed = False
                     for sel in [
                         '.swal-button--confirm',
@@ -871,7 +853,6 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                 logger.info('[7] Navegación detectada! URL: %s → %s', url_inicial, page.url)
             except Exception as nav_err:
                 logger.warning('[7] expect_navigation falló: %s', nav_err)
-                # Detectar si navegó a pesar del error
                 try:
                     url_actual = page.url
                     if url_actual and url_actual != url_inicial:
@@ -886,7 +867,6 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                 logger.info('[7] Fallback: esperando carga de página...')
                 try:
                     page.wait_for_load_state('networkidle', timeout=10000)
-                    logger.info('[7] load_state completado (fallback)')
                 except Exception:
                     page.wait_for_timeout(3000)
                 try:
@@ -896,7 +876,6 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                 except Exception:
                     pass
 
-            # Asegurar que el DOM de la nueva página esté listo
             try:
                 page.wait_for_load_state('domcontentloaded', timeout=10000)
             except Exception:
@@ -904,10 +883,27 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             page.wait_for_timeout(1000)
 
-            # Cerrar modal de éxito (ahora en la NUEVA página si navegó)
             _cerrar_modales(page)
             page.wait_for_timeout(500)
-            checkpoint('07_enviado')
+            texto_envio = checkpoint('07_enviado')
+
+            # ════════════════════════════════════════════════════════════════
+            #  FASE 7.5: Detectar errores de validación del portal
+            # ════════════════════════════════════════════════════════════════
+            # Si el portal rechazó el envío, mostrará la misma página con
+            # errores de validación. Detectarlos temprano evita perder tiempo
+            # en Phase 8 intentando extraer folio de una página de error.
+            logger.info('[7.5] Verificando errores de validación...')
+            screenshot('07_5_post_envio')
+            if not navegacion_completa:
+                errores_validacion = _detectar_errores_validacion(page)
+                if errores_validacion:
+                    msgs = '; '.join([f"{e['name']}: {e['msg']}" for e in errores_validacion[:5]])
+                    logger.warning('[7.5] Errores de validación detectados: %s', msgs)
+                    resultado.error = f'El portal rechazó la solicitud. Errores: {msgs}'
+                    resultado.detalle = f'URL={page.url} | ERRORES={msgs}'
+                    browser.close()
+                    return resultado  # Salir temprano
 
             # ════════════════════════════════════════════════════════════════
             #  FASE 8: Extraer folio + Descargar acuse PDF
@@ -918,8 +914,8 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             texto_pagina = ''
             url_actual = ''
 
-            # Patrones de folio (definidos ANTES del try para que estén disponibles
-            # en Phase 8d incluso si Phase 8a falla)
+            # Patrones de folio (definidos antes del try para que estén
+            # disponibles en Phase 8d incluso si Phase 8a falla)
             FOLIO_PATTERNS = [
                 r'[Ff]olio[:\s#Nº°\.]*([A-Z0-9][-A-Z0-9/]+)',
                 r'N[úu]mero\s+de\s+[Ss]olicitud[:\s]*([A-Z0-9][-A-Z0-9/]+)',
@@ -943,7 +939,6 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                 texto_pagina = page.inner_text('body')
                 logger.info('[8] Texto de página de confirmación: %s...', texto_pagina[:600].replace('\n', ' | '))
 
-                # También extraer la URL actual (el folio puede estar en la URL)
                 try:
                     url_actual = page.url
                     url_final = url_actual
@@ -979,13 +974,11 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                 logger.warning('[8] Error al extraer texto de página: %s', e)
 
             # ── 8b: Intentar descargar el PDF del acuse ───────────────────
-            # Intentar con botones primero
             for texto_btn in ['acuse', 'descargar', 'pdf', 'comprobante', 'recibo',
                               'imprimir', 'constancia', 'documento']:
                 _btn_click(page, texto_btn)
                 page.wait_for_timeout(600)
 
-            # También intentar con links directos que apunten a archivos o descarga
             try:
                 link_encontrado = page.evaluate("""() => {
                     const keywords = ['acuse', 'descargar', 'pdf', 'folio', 'comprobante',
@@ -1008,13 +1001,11 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
             except Exception:
                 pass
 
-            # Esperar a que la descarga termine
             try:
                 page.wait_for_load_state('networkidle', timeout=10000)
             except Exception:
                 pass
             page.wait_for_timeout(2000)
-
             checkpoint('08_confirmacion')
 
             # ── 8c: Si se descargó un PDF, extraer folio de él también ───
@@ -1024,7 +1015,6 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                 nombre_pdf = pdf_path.stem
                 logger.info('[8] PDF descargado: %s', nombre_pdf)
 
-                # Folio desde el nombre del archivo
                 if not resultado.folio:
                     for pat in [r'(CCL[-/][\w/-]+)', r'(\d{4}[-/]\d{4,8})', r'([\w-]+folio[\w-]*)']:
                         m = re.search(pat, nombre_pdf, re.IGNORECASE)
@@ -1032,7 +1022,6 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                             resultado.folio = m.group(1)
                             break
 
-                # Folio desde el contenido del PDF
                 if not resultado.folio:
                     try:
                         with open(pdf_descargado, 'rb') as f:
@@ -1052,7 +1041,6 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                 logger.info('[8] Éxito con PDF. Folio=%s', resultado.folio)
 
             elif resultado.success and resultado.folio:
-                # Folio encontrado en texto aunque sin PDF
                 resultado.detalle = f'Solicitud enviada. Folio: {resultado.folio} (sin PDF)'
                 logger.info('[8] Éxito sin PDF. Folio=%s', resultado.folio)
 
@@ -1069,7 +1057,6 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                         for (const link of document.querySelectorAll(sel)) {
                             if (link.href) return link.href;
                         }
-                        // Buscar también en iframes / embeds
                         for (const el of document.querySelectorAll('iframe, embed, object')) {
                             if (el.src && el.src.includes('pdf')) return el.src;
                         }
@@ -1087,17 +1074,14 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                         resultado.detalle = f'Solicitud enviada. Folio: {resultado.folio} (desde URL)'
                         logger.info('[8d] Folio extraído de URL: %s', resultado.folio)
                     else:
-                        # ── Intentar navegar al documento para descargar PDF ──
                         logger.info('[8d] Navegando a doc_url para descargar PDF: %s', doc_url)
                         try:
                             page.goto(doc_url, wait_until='networkidle', timeout=15000)
                             page.wait_for_timeout(2000)
 
-                            # Intentar extraer folio de la página de documento
                             try:
                                 doc_texto = page.inner_text('body')
                                 logger.info('[8d] Texto de página documento: %s...', doc_texto[:500].replace('\n', ' | '))
-                                # Buscar folio en esta página
                                 for pat in FOLIO_PATTERNS:
                                     m = re.search(pat, doc_texto)
                                     if m:
@@ -1109,24 +1093,20 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                             except Exception:
                                 pass
 
-                            # Si no se encontró folio aún, buscar botón de descarga
                             for txt in ['descargar', 'acuse', 'pdf', 'guardar', 'imprimir', 'recibo', 'comprobante']:
                                 if _btn_click(page, txt):
                                     page.wait_for_timeout(1000)
                                     break
 
-                            # Esperar posible descarga
                             try:
                                 page.wait_for_load_state('networkidle', timeout=8000)
                             except Exception:
                                 pass
-                            # Dar tiempo adicional para que la descarga comience
                             page.wait_for_timeout(3000)
                             checkpoint('08_pdf_navegado')
                         except Exception as nav_err:
                             logger.warning('[8d] Error navegando a doc_url: %s', nav_err)
 
-                        # Si se descargó un PDF, extraer folio
                         if pdf_descargado:
                             pdf_path = Path(pdf_descargado)
                             resultado.pdf_path = str(pdf_path)
@@ -1138,7 +1118,6 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                                 resultado.detalle = f'Solicitud enviada. Folio: {resultado.folio}'
                                 logger.info('[8d] Éxito con PDF. Folio=%s', resultado.folio)
 
-                    # Si después de todo no se encontró folio, guardar diagnóstico
                     if not resultado.folio:
                         resultado.error = 'Solicitud enviada al portal pero no se pudo obtener el folio'
                         try:
@@ -1167,7 +1146,6 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
     except Exception as e:
         logger.exception('Error en la automatización de conciliación')
         resultado.error = f'{type(e).__name__}: {e}'
-        # Guardar URL para diagnóstico
         if not resultado.detalle and url_final:
             resultado.detalle = f'URL={url_final} | EXCEPTION={e}'
 
