@@ -10,7 +10,7 @@ Autor: Conciliacion Laboral Tijuana
 
 from decimal import Decimal
 from datetime import date
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from django.utils import timezone
 
