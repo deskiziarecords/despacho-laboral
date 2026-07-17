@@ -158,8 +158,9 @@ if EMAIL_BACKEND == 'django.core.mail.backends.smtp.EmailBackend':
 # Railway inyecta REDIS_URL automáticamente al agregar Redis
 # Si no hay Redis configurado, Celery se desactiva y se usa threading como fallback
 # (útil para desarrollo local sin Redis)
-CELERY_BROKER_URL = os.environ.get('REDIS_URL', '')
-CELERY_RESULT_BACKEND = os.environ.get('REDIS_URL', '')
+_REDIS_URL = os.environ.get('REDIS_URL', '')
+CELERY_BROKER_URL = _REDIS_URL or 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = _REDIS_URL or 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
