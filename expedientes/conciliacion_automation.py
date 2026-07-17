@@ -1084,6 +1084,7 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                     if m:
                         resultado.folio = (m.group(1) or m.group(2))
                         resultado.success = True
+                        resultado.detalle = f'Solicitud enviada. Folio: {resultado.folio} (desde URL)'
                         logger.info('[8d] Folio extraído de URL: %s', resultado.folio)
                     else:
                         # ── Intentar navegar al documento para descargar PDF ──
