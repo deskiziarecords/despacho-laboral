@@ -254,6 +254,51 @@ def _click_validar_continuar(page):
         return False
 
 
+def _extraer_folio_desde_pdf(pdf_path, nombre_pdf=''):
+    """
+    Extrae el folio del nombre del archivo PDF o de su contenido.
+    Retorna el folio como string, o cadena vacía si no encuentra.
+    """
+    import re as _re
+
+    # 1. Intentar desde el nombre del archivo
+    for pat in [
+        r'(CCL[-/][\w/-]+)',
+        r'(BC[-/]CCFL[-/][\w/-]+)',
+        r'(\d{4}[-/]\d{4,8})',
+        r'([\w-]+folio[\w-]*)',
+        r'(solicitud[\w-]*)',
+    ]:
+        m = _re.search(pat, nombre_pdf, _re.IGNORECASE)
+        if m:
+            return m.group(1).strip()
+
+    # 2. Intentar desde el contenido del PDF (bytes decodificados)
+    try:
+        with open(pdf_path, 'rb') as f:
+            contenido = f.read()
+        texto_pdf = contenido.decode('latin-1', errors='ignore')
+
+        for pat in [
+            r'[Ff]olio[:\s#Nº°\.]*([A-Z0-9][-A-Z0-9/]+)',
+            r'N[úu]mero\s+de\s+[Ss]olicitud[:\s]*([A-Z0-9][-A-Z0-9/]+)',
+            r'(CCL[:\s]*/[\d\-]+)',
+            r'FOLIO[:\s]*([\w/-]+)',
+            r'N[úu]mero[:\s]*([\w/-]+)',
+            r'(\d{4}[-/]\d{4,8})',
+            r'(CCL[\s-][\d\-]+)',
+            r'(BC[\s-]CCFL[\s-][\d\-]+)',
+            r'Expediente[:\s#]*([A-Z0-9][-A-Z0-9/]+)',
+        ]:
+            m = _re.search(pat, texto_pdf, _re.IGNORECASE)
+            if m:
+                return m.group(1).strip()
+    except Exception:
+        pass
+
+    return ''
+
+
 # ══════════════════════════════════════════════════════════════════════════
 #  Llenado de datos del solicitante y citado
 # ══════════════════════════════════════════════════════════════════════════
@@ -965,16 +1010,21 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
 
             else:
                 # ── 8d: Buscar enlace de descarga como último recurso ─────
+                doc_url = ''
                 try:
                     doc_url = page.evaluate("""() => {
                         const sel = 'a[href*="getFile"], a[href*="acuse"], a[href*="documento"], a[href*="folio"], a[href*=".pdf"]';
                         for (const link of document.querySelectorAll(sel)) {
                             if (link.href) return link.href;
                         }
+                        // Buscar también en iframes / embeds
+                        for (const el of document.querySelectorAll('iframe, embed, object')) {
+                            if (el.src && el.src.includes('pdf')) return el.src;
+                        }
                         return '';
                     }""")
                 except Exception:
-                    doc_url = ''
+                    pass
 
                 if doc_url:
                     resultado.detalle = f'Solicitud enviada. URL documento: {doc_url}'
@@ -982,13 +1032,45 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None) -> Resul
                     if m:
                         resultado.folio = (m.group(1) or m.group(2))
                         resultado.success = True
+                        logger.info('[8d] Folio extraído de URL: %s', resultado.folio)
+                    else:
+                        # ── Intentar navegar al documento para descargar PDF ──
+                        logger.info('[8d] Navegando a doc_url para descargar PDF: %s', doc_url)
+                        try:
+                            page.goto(doc_url, wait_until='networkidle', timeout=15000)
+                            page.wait_for_timeout(2000)
+                            # Si hay un botón de descarga, clickearlo
+                            for txt in ['descargar', 'acuse', 'pdf', 'guardar']:
+                                if _btn_click(page, txt):
+                                    page.wait_for_timeout(1000)
+                                    break
+                            # Esperar posible descarga
+                            try:
+                                page.wait_for_load_state('networkidle', timeout=8000)
+                            except Exception:
+                                pass
+                            page.wait_for_timeout(2000)
+                            checkpoint('08_pdf_navegado')
+                        except Exception as nav_err:
+                            logger.warning('[8d] Error navegando a doc_url: %s', nav_err)
+
+                        # Si se descargó un PDF, extraer folio
+                        if pdf_descargado:
+                            pdf_path = Path(pdf_descargado)
+                            resultado.pdf_path = str(pdf_path)
+                            nombre_pdf = pdf_path.stem
+                            logger.info('[8d] PDF descargado desde doc_url: %s', nombre_pdf)
+                            resultado.folio = _extraer_folio_desde_pdf(pdf_descargado, nombre_pdf)
+                            if resultado.folio:
+                                resultado.success = True
+                                resultado.detalle = f'Solicitud enviada. Folio: {resultado.folio}'
+                                logger.info('[8d] Éxito con PDF. Folio=%s', resultado.folio)
                 else:
                     resultado.error = 'Solicitud enviada al portal pero no se pudo obtener el folio'
                     try:
                         url_final = page.url
                     except Exception:
                         url_final = 'desconocida'
-                    # Store page text so it's visible in the task detalle for debugging
                     resultado.detalle = f'URL={url_final} | TEXTO={texto_pagina[:800]}'
 
             browser.close()
