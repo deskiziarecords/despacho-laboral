@@ -674,6 +674,48 @@ class ApoderadoLegal(models.Model):
         return f'{self.nombre}{cedula}'
 
 
+class DemandadoAdicional(models.Model):
+    """Persona física o moral demandada además del patrón principal del cliente.
+
+    El patrón principal sigue capturándose en los campos `empresa_*` del
+    `Cliente`; aquí van los demás sujetos (otra razón social del grupo, el
+    dueño como persona física, una empresa de outsourcing, etc.).  Cada uno
+    se agrega como un numeral más en el capítulo de DEMANDADOS.
+    """
+
+    TIPO_PERSONA_CHOICES = [
+        ('moral', 'Persona Moral'),
+        ('fisica', 'Persona Física'),
+    ]
+
+    cliente = models.ForeignKey(
+        'Cliente', on_delete=models.CASCADE, related_name='demandados_adicionales',
+        verbose_name='Cliente')
+    tipo_persona = models.CharField('Tipo de persona', max_length=10,
+                                    choices=TIPO_PERSONA_CHOICES, default='moral')
+    nombre = models.CharField('Nombre o razón social', max_length=200)
+    rfc = models.CharField('RFC', max_length=13, blank=True)
+    telefono = models.CharField('Teléfono', max_length=15, blank=True)
+    calle = models.CharField('Calle', max_length=200, blank=True)
+    numero = models.CharField('Número', max_length=20, blank=True)
+    colonia = models.CharField('Colonia', max_length=200, blank=True)
+    cp = models.CharField('Código Postal', max_length=10, blank=True)
+    orden = models.PositiveIntegerField('Orden', default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Demandado adicional'
+        verbose_name_plural = 'Demandados adicionales'
+        ordering = ['orden', 'pk']
+
+    def __str__(self):
+        return self.nombre
+
+    @property
+    def tiene_domicilio(self):
+        return bool(self.calle or self.colonia or self.cp)
+
+
 class AutorizadoNotificacion(models.Model):
     """Persona autorizada para oír y recibir notificaciones (arts. 692, 693 y 696 LFT)."""
 

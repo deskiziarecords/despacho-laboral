@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils import timezone
 
-from .models import Cliente, Expediente, Documento, Movimiento, Nota, SolicitudConciliacion, WhatsAppMessage, LegalConfig, CalculoLaboral, Machote, Aviso, SolicitudTransferencia, Notificacion, TareaConciliacion, Empresa, ApoderadoLegal, AutorizadoNotificacion
+from .models import Cliente, Expediente, Documento, Movimiento, Nota, SolicitudConciliacion, WhatsAppMessage, LegalConfig, CalculoLaboral, Machote, Aviso, SolicitudTransferencia, Notificacion, TareaConciliacion, Empresa, ApoderadoLegal, AutorizadoNotificacion, DemandadoAdicional
 
 
 @admin.register(ApoderadoLegal)
@@ -59,8 +59,15 @@ class SolicitudTransferenciaAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 
+class DemandadoAdicionalInline(admin.TabularInline):
+    model = DemandadoAdicional
+    extra = 0
+    fields = ['orden', 'tipo_persona', 'nombre', 'rfc', 'telefono', 'calle', 'numero', 'colonia', 'cp']
+
+
 @admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
+    inlines = [DemandadoAdicionalInline]
     list_display = ['nombre', 'curp', 'telefono', 'email', 'empresa', 'como_supo', 'oficina', 'created_at']
     search_fields = ['nombre', 'curp', 'rfc', 'telefono', 'email', 'como_supo', 'oficina']
     list_filter = ['empresa', 'como_supo', 'oficina', 'created_at']

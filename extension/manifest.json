@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Conciliación BC — Asistente",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Llena automáticamente el formulario de conciliación del portal de Baja California con los datos de tu expediente, y guarda el folio y el acuse en la app.",
   "permissions": ["storage", "activeTab"],
   "host_permissions": [

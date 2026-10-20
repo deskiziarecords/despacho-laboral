@@ -257,6 +257,79 @@
     await sleep(300);
   }
 
+  // ─── Llenado de UN citado ───────────────────────────────────────────────
+
+  async function llenarCitado(cit) {
+    const esMoral = cit.tipo_persona === '2'; // '1' = Física, '2' = Moral
+    clickRadio('solicitado[tipo_persona_id]', cit.tipo_persona);
+    await sleep(600);
+    closeModals();
+    await sleep(300);
+
+    if (esMoral) {
+      // ─── Persona Moral: razón social, RFC, contacto, domicilio ────
+      setValue(byName('solicitado[razon_social]'), cit.nombre || 'Empresa SA de CV');
+      await sleep(300);
+
+      if (cit.rfc) {
+        setValue(byName('solicitado[rfc]'), cit.rfc);
+        await sleep(200);
+      }
+
+      setValue(byName('contactos[1]'), limpiarTelefono(cit.telefono));
+      if (cit.email) {
+        setValue(byName('contactos_email'), cit.email);
+        await sleep(200);
+      }
+    } else {
+      // ─── Persona Física: CURP, nombre, apellidos, RFC, etc. ──────
+      const partes = (cit.nombre || 'Empresa SA de CV').split(/\s+/);
+      setValue(byName('solicitado[nombre]'), truncar(partes[0] || 'Empresa', 6));
+      setValue(byName('solicitado[primer_apellido]'), truncar(partes[1] || 'SA', 6));
+      setValue(byName('solicitado[segundo_apellido]'),
+               truncar(partes.length <= 2 ? 'de CV' : partes.slice(2).join(' '), 6));
+      await sleep(300);
+
+      // CURP del citado — tipear tecla por tecla
+      if (cit.curp && cit.curp.length >= 15) {
+        const curpEl = byName('solicitado[curp]');
+        if (curpEl) {
+          curpEl.focus();
+          curpEl.value = '';
+          for (const ch of cit.curp) {
+            curpEl.value += ch;
+            curpEl.dispatchEvent(new Event('input', { bubbles: true }));
+            await sleep(5);
+          }
+          await sleep(20);
+        }
+        await sleep(100);
+      }
+
+      // Nota: fecha_nacimiento y edad del citado NO se llenan porque
+      // el sistema no almacena la fecha del patrón.
+
+      if (cit.rfc) {
+        setValue(byName('solicitado[rfc]'), cit.rfc);
+        await sleep(200);
+      }
+
+      selectOption('solicitado[genero_id]', '1');       // MASCULINO
+      selectOption('solicitado[nacionalidad_id]', '1'); // MEXICANA
+      await sleep(300);
+
+      setValue(byName('contactos[1]'), limpiarTelefono(cit.telefono));
+      if (cit.email) {
+        setValue(byName('contactos_email'), cit.email);
+        await sleep(200);
+      }
+    }
+
+    // Domicilio del citado (común para ambos tipos)
+    await llenarDomicilio('domicilio', cit.calle, cit.numero, cit.cp);
+    await sleep(500);
+  }
+
   // ─── Panel flotante ──────────────────────────────────────────────────────
 
   function crearPanel() {
@@ -601,100 +674,56 @@
     }
     pasoActual = 5; setPasos(PASOS, pasoActual);
 
-    // ── FASE 5: Citado (empresa/patrón) ──────────────────────────────
-    setEstado('Llenando datos del citado (empresa)…');
-    const navCit = await navigateTab('citado');
-    await sleep(1200);
-    if (!navCit) {
-      setEstado('⚠️ No se pudo navegar a tab "Citado". Reintentando…', 'warn');
+    // ── FASE 5: Citado(s) ────────────────────────────────────────────
+    // La app manda `citados` (patrón principal + demandados adicionales).
+    // Versiones anteriores de la app solo mandaban los campos empresa_*.
+    const citados = (Array.isArray(c.citados) && c.citados.length) ? c.citados : [{
+      nombre: c.empresa_nombre, tipo_persona: c.tipo_persona,
+      calle: c.empresa_calle, numero: c.empresa_numero, cp: c.empresa_cp,
+      telefono: c.empresa_telefono, rfc: c.empresa_rfc, curp: c.empresa_curp,
+      email: c.empresa_email,
+    }];
+
+    for (let n = 0; n < citados.length; n++) {
+      const cit = citados[n];
+      const etiqueta = citados.length > 1
+        ? `citado ${n + 1} de ${citados.length} (${cit.nombre || 'sin nombre'})`
+        : 'citado (empresa)';
+      setEstado(`Llenando datos del ${etiqueta}…`);
+      const navCit = await navigateTab('citado');
+      await sleep(1200);
+      if (!navCit) {
+        setEstado('⚠️ No se pudo navegar a tab "Citado". Reintentando…', 'warn');
+        await sleep(2000);
+        await navigateTab('citado', 6000);
+        await sleep(1500);
+      }
+      const filasAntes = document.querySelectorAll('#divTablaCitados tbody tr').length;
+
+      const btnAgregar = document.querySelector('#btn_agregar_citado');
+      if (btnAgregar && btnAgregar.offsetParent !== null) btnAgregar.click();
+      else await clickButton('agregar citado');
       await sleep(2000);
-      await navigateTab('citado', 6000);
+      closeModals();
+      await sleep(500);
+
+      await llenarCitado(cit);
+
+      await clickButton('Guardar citado', 6000) || await clickButton('Guardar', 6000);
       await sleep(1500);
-    }
-    await clickButton('agregar citado');
-    await sleep(2000);
-    closeModals();
-    await sleep(500);
+      closeModals();
+      await sleep(500);
 
-    const esMoral = c.tipo_persona === '2'; // '1' = Física, '2' = Moral
-    clickRadio('solicitado[tipo_persona_id]', c.tipo_persona);
-    await sleep(600);
-    closeModals();
-    await sleep(300);
-
-    if (esMoral) {
-      // ─── Persona Moral: razón social, RFC, contacto, domicilio ────
-      setValue(byName('solicitado[razon_social]'), c.empresa_nombre || 'Empresa SA de CV');
-      await sleep(300);
-
-      // RFC del citado (si hay)
-      if (c.empresa_rfc) {
-        setValue(byName('solicitado[rfc]'), c.empresa_rfc);
-        await sleep(200);
-      }
-
-      // Contacto
-      setValue(byName('contactos[1]'), limpiarTelefono(c.empresa_telefono));
-      if (c.empresa_email) {
-        setValue(byName('contactos_email'), c.empresa_email);
-        await sleep(200);
-      }
-    } else {
-      // ─── Persona Física: CURP, nombre, apellidos, RFC, etc. ──────
-      const empresaParts = (c.empresa_nombre || 'Empresa SA de CV').split(/\s+/);
-      setValue(byName('solicitado[nombre]'), truncar(empresaParts[0] || 'Empresa', 6));
-      setValue(byName('solicitado[primer_apellido]'), truncar(empresaParts[1] || 'SA', 6));
-      setValue(byName('solicitado[segundo_apellido]'),
-               truncar(empresaParts.length <= 2 ? 'de CV' : empresaParts.slice(2).join(' '), 6));
-      await sleep(300);
-
-      // CURP del citado — mismo approach que solicitante: tipear tecla por tecla
-      if (c.empresa_curp && c.empresa_curp.length >= 15) {
-        const curpEl = byName('solicitado[curp]');
-        if (curpEl) {
-          curpEl.focus();
-          curpEl.value = '';
-          for (const ch of c.empresa_curp) {
-            curpEl.value += ch;
-            curpEl.dispatchEvent(new Event('input', { bubbles: true }));
-            await sleep(5);
-          }
-          await sleep(20);
+      // Con más de un citado, esperar a que el portal liste el recién
+      // guardado antes de abrir el formulario del siguiente.
+      if (citados.length > 1) {
+        const inicio = Date.now();
+        while (Date.now() - inicio < 10000 &&
+               document.querySelectorAll('#divTablaCitados tbody tr').length <= filasAntes) {
+          await sleep(500);
         }
-        await sleep(100);
-      }
-
-      // Nota: fecha_nacimiento y edad del citado NO se llenan porque
-      // el modelo Cliente no almacena la fecha del patrón. Se dejan vacíos
-      // para que el asesor los capture manualmente si el portal los pide.
-
-      // RFC del citado (si hay)
-      if (c.empresa_rfc) {
-        setValue(byName('solicitado[rfc]'), c.empresa_rfc);
-        await sleep(200);
-      }
-
-      // Género y nacionalidad
-      selectOption('solicitado[genero_id]', '1');       // MASCULINO
-      selectOption('solicitado[nacionalidad_id]', '1'); // MEXICANA
-      await sleep(300);
-
-      // Contacto
-      setValue(byName('contactos[1]'), limpiarTelefono(c.empresa_telefono));
-      if (c.empresa_email) {
-        setValue(byName('contactos_email'), c.empresa_email);
-        await sleep(200);
       }
     }
-
-    // Domicilio del citado (común para ambos tipos)
-    await llenarDomicilio('domicilio', c.empresa_calle, c.empresa_numero, c.empresa_cp);
-    await sleep(500);
-
-    await clickButton('Guardar', 6000);
-    await sleep(1500);
-    closeModals();
-    await sleep(500);
     pasoActual = 6; setPasos(PASOS, pasoActual);
 
     setEstado('Validando citado…');

@@ -3,7 +3,7 @@ from django.forms import inlineformset_factory
 
 from .models import (Expediente, Cliente, Documento, Nota, SolicitudConciliacion,
                     WhatsAppMessage, CalculoLaboral, Machote,
-                    ApoderadoLegal, AutorizadoNotificacion)
+                    ApoderadoLegal, AutorizadoNotificacion, DemandadoAdicional)
 from django.contrib.auth.models import User
 
 
@@ -513,6 +513,36 @@ class WhatsAppMessageForm(forms.ModelForm):
 class NuevaDemandaForm(forms.Form):
     nombre = forms.CharField(label='Nombre completo del cliente', max_length=200,
                              widget=forms.TextInput(attrs={'class': 'input'}))
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# DEMANDADOS ADICIONALES (capítulo 2 de la demanda)
+# ══════════════════════════════════════════════════════════════════════════
+
+class DemandadoAdicionalForm(forms.ModelForm):
+    """Otra persona física o moral demandada además del patrón principal."""
+
+    class Meta:
+        model = DemandadoAdicional
+        fields = ['tipo_persona', 'nombre', 'rfc', 'telefono',
+                  'calle', 'numero', 'colonia', 'cp']
+        widgets = {
+            'tipo_persona': forms.Select(attrs={'class': 'input'}),
+            'nombre': forms.TextInput(attrs={
+                'class': 'input', 'placeholder': 'Nombre completo o razón social'}),
+            'rfc': forms.TextInput(attrs={'class': 'input', 'placeholder': 'RFC (opcional)'}),
+            'telefono': forms.TextInput(attrs={'class': 'input', 'placeholder': '+52 55 1234 5678'}),
+            'calle': forms.TextInput(attrs={'class': 'input', 'placeholder': 'Calle'}),
+            'numero': forms.TextInput(attrs={'class': 'input', 'placeholder': 'Número'}),
+            'colonia': forms.TextInput(attrs={'class': 'input', 'placeholder': 'Colonia'}),
+            'cp': forms.TextInput(attrs={'class': 'input', 'placeholder': 'Código Postal'}),
+        }
+
+
+DemandadoAdicionalFormSet = inlineformset_factory(
+    Cliente, DemandadoAdicional, form=DemandadoAdicionalForm,
+    extra=0, can_delete=True,
+)
 
 
 # ══════════════════════════════════════════════════════════════════════════

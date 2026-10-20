@@ -24,6 +24,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
+from .conciliacion_automation import citados_de_cliente
 from .models import Documento, TareaConciliacion
 from .signals import registrar_movimiento
 
@@ -146,6 +147,23 @@ def _serializar_tarea(tarea):
             'empresa_rfc': cliente.empresa_rfc or cliente.rfc or '',
             'empresa_curp': (cliente.empresa_curp or '').strip().upper(),
             'empresa_email': cliente.email or '',
+            # Todos los citados (principal + demandados adicionales), en orden.
+            # Los campos empresa_* de arriba se conservan para versiones
+            # anteriores de la extensión, que solo registraban al principal.
+            'citados': [
+                {
+                    'nombre': c['nombre'],
+                    'tipo_persona': TIPO_PERSONA_PORTAL_IDS.get(c['tipo_persona'], '1'),
+                    'calle': c['calle'],
+                    'numero': c['numero'],
+                    'cp': c['cp'],
+                    'telefono': c['telefono'],
+                    'rfc': c['rfc'],
+                    'curp': c['curp'],
+                    'email': c['email'],
+                }
+                for c in citados_de_cliente(cliente)
+            ],
         },
         'hechos': ' '.join(hechos),
     }

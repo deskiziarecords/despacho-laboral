@@ -962,8 +962,49 @@ def _fill_input_scoped(page, name, valor, panel=None):
         pass
     return False
 
-def _llenar_citado(page, cliente):
-    """Llena los campos del citado (empresa/patrón).
+def citados_de_cliente(cliente):
+    """Lista de citados para el portal: el patrón principal y los adicionales.
+
+    El principal sale de los campos `empresa_*` del cliente (con los mismos
+    respaldos de siempre); después van los `DemandadoAdicional` en su orden.
+    Un adicional sin domicilio propio (o con datos incompletos) toma los
+    datos faltantes del principal, porque el portal exige domicilio.
+    """
+    principal = {
+        'tipo_persona': cliente.tipo_persona_citado or 'fisica',
+        'nombre': cliente.empresa_razon_social or cliente.empresa or 'Empresa SA de CV',
+        'rfc': cliente.empresa_rfc or cliente.rfc or '',
+        'curp': (cliente.empresa_curp or '').strip().upper(),
+        'telefono': cliente.empresa_telefono or cliente.telefono or '',
+        'email': cliente.email or '',
+        'calle': cliente.empresa_calle or cliente.direccion_calle or '',
+        'numero': cliente.empresa_numero or cliente.direccion_numero or '',
+        'cp': cliente.empresa_cp or cliente.direccion_cp or '',
+        'colonia': cliente.empresa_colonia or cliente.direccion_colonia or '',
+    }
+    citados = [principal]
+    if not cliente.pk:
+        return citados
+    for d in cliente.demandados_adicionales.all():
+        if not (d.nombre or '').strip():
+            continue
+        citados.append({
+            'tipo_persona': d.tipo_persona or 'moral',
+            'nombre': d.nombre.strip(),
+            'rfc': d.rfc or '',
+            'curp': '',
+            'telefono': d.telefono or principal['telefono'],
+            'email': principal['email'],
+            'calle': d.calle or principal['calle'],
+            'numero': d.numero or principal['numero'],
+            'cp': d.cp or principal['cp'],
+            'colonia': d.colonia or ('' if d.cp else principal['colonia']),
+        })
+    return citados
+
+
+def _llenar_citado(page, citado):
+    """Llena los campos de UN citado (dict de `citados_de_cliente`).
 
     Soporta tanto Persona Física como Moral. El portal muestra campos
     diferentes según el tipo:
@@ -971,11 +1012,11 @@ def _llenar_citado(page, cliente):
         RFC, género, nacionalidad, estado nacimiento, teléfono, email, domicilio
       - Persona Moral: razón social, RFC, teléfono, email, domicilio
     """
-    empresa_nombre = cliente.empresa_razon_social or cliente.empresa or 'Empresa SA de CV'
-    es_moral = cliente.tipo_persona_citado == 'moral'
+    empresa_nombre = citado['nombre'] or 'Empresa SA de CV'
+    es_moral = citado['tipo_persona'] == 'moral'
 
-    # Tipo persona: desde el modelo (Física o Moral)
-    tipo_persona_id = TIPO_PERSONA_PORTAL_IDS.get(cliente.tipo_persona_citado, '1')
+    # Tipo persona: Física o Moral
+    tipo_persona_id = TIPO_PERSONA_PORTAL_IDS.get(citado['tipo_persona'], '1')
     _click_radio(page, 'solicitado[tipo_persona_id]', tipo_persona_id)
     page.wait_for_timeout(500)
 
@@ -983,17 +1024,14 @@ def _llenar_citado(page, cliente):
         # ─── Persona Moral: razón social, RFC, contacto, domicilio ──
         _fill_input(page, 'solicitado[nombre_comercial]', empresa_nombre)
 
-        # RFC del citado (empresa)
-        empresa_rfc = cliente.empresa_rfc or cliente.rfc or ''
-        if empresa_rfc:
-            _fill_input(page, 'solicitado[rfc]', empresa_rfc)
+        if citado['rfc']:
+            _fill_input(page, 'solicitado[rfc]', citado['rfc'])
 
         # Teléfono de contacto
-        _fill_input_scoped(page, 'contactos[1]',
-                         _limpiar_telefono(cliente.empresa_telefono or cliente.telefono),
+        _fill_input_scoped(page, 'contactos[1]', _limpiar_telefono(citado['telefono']),
                          panel='#stepCitado')
-        if cliente.email:
-            _fill_input_scoped(page, 'contactos[3]', cliente.email or '',
+        if citado['email']:
+            _fill_input_scoped(page, 'contactos[3]', citado['email'],
                              panel='#stepCitado')
     else:
         # ─── Persona Física: nombre, apellidos, CURP, RFC, etc. ────
@@ -1004,7 +1042,7 @@ def _llenar_citado(page, cliente):
                     _truncar('de CV' if len(nombre_parts) <= 2 else ' '.join(nombre_parts[2:]), 6))
 
         # CURP del citado (si hay, tipear carácter por carácter)
-        empresa_curp = (cliente.empresa_curp or '').strip().upper()
+        empresa_curp = citado['curp']
         if empresa_curp and len(empresa_curp) >= 15:
             curp_el = page.query_selector('[name="solicitado[curp]"]')
             if curp_el:
@@ -1018,26 +1056,23 @@ def _llenar_citado(page, cliente):
         _select_option(page, 'solicitado[genero_id]', '1')             # MASCULINO
         _select_option(page, 'solicitado[nacionalidad_id]', '1')       # MEXICANA
 
-        # RFC del citado (empresa)
-        empresa_rfc = cliente.empresa_rfc or cliente.rfc or ''
-        if empresa_rfc:
-            _fill_input(page, 'solicitado[rfc]', empresa_rfc)
+        if citado['rfc']:
+            _fill_input(page, 'solicitado[rfc]', citado['rfc'])
 
         # Teléfono y email
-        _fill_input_scoped(page, 'contactos[1]',
-                         _limpiar_telefono(cliente.empresa_telefono or cliente.telefono),
+        _fill_input_scoped(page, 'contactos[1]', _limpiar_telefono(citado['telefono']),
                          panel='#stepCitado')
-        if cliente.email:
-            _fill_input_scoped(page, 'contactos[3]', cliente.email or '',
+        if citado['email']:
+            _fill_input_scoped(page, 'contactos[3]', citado['email'],
                              panel='#stepCitado')
 
     # Domicilio del citado (común para ambos tipos)
     _llenar_domicilio(page,
-                      vialidad=cliente.empresa_calle or cliente.direccion_calle,
-                      num_ext=cliente.empresa_numero or cliente.direccion_numero,
-                      cp=cliente.empresa_cp or cliente.direccion_cp,
+                      vialidad=citado['calle'],
+                      num_ext=citado['numero'],
+                      cp=citado['cp'],
                       scope='#frmCitado',
-                      colonia=cliente.empresa_colonia or cliente.direccion_colonia)
+                      colonia=citado['colonia'])
 
     page.wait_for_timeout(500)
     # El guardado ("Guardar citado" = POST /solicitud/store_citado) lo hace
@@ -1532,84 +1567,102 @@ def enviar_a_conciliacion(expediente, headless=True, download_dir=None, modo='au
             # ════════════════════════════════════════════════════════════════
             #  FASE 5: Citado (Empresa/Patrón)
             # ════════════════════════════════════════════════════════════════
-            logger.info('[5] Llenando datos del citado...')
+            citados = citados_de_cliente(cliente)
+            logger.info('[5] Llenando datos de %d citado(s)...', len(citados))
 
-            _navigate_wizard_tab(page, 'citado')
-            page.wait_for_timeout(800)
-
-            # El portal ahora pregunta "¿Tienes recibos de nómina oficiales?"
-            # Seleccionar "No" para proceder
-            page.evaluate("""() => {
-                const no = document.querySelector('#recibo_oficial_no');
-                if (no && no.offsetParent !== null) {
-                    no.checked = true; no.click();
-                    no.dispatchEvent(new Event('change', {bubbles: true}));
-                }
-                const no2 = document.querySelector('#recibo_pago_no');
-                if (no2 && no2.offsetParent !== null) {
-                    no2.checked = true; no2.click();
-                    no2.dispatchEvent(new Event('change', {bubbles: true}));
-                }
-            }""")
-            page.wait_for_timeout(500)
-
-            # Clic en "Agregar Citado" usando JS directo
-            page.evaluate("""() => {
-                const panel = document.querySelector('#stepCitado');
-                const searchIn = panel || document;
-                const btns = Array.from(searchIn.querySelectorAll('button, a, span'))
-                    .filter(b => b.offsetParent !== null)
-                    .filter(b => {
-                        const t = b.textContent.trim().toLowerCase();
-                        return t.includes('agregar') && t.includes('citado');
-                    });
-                btns.sort((a, b) => a.textContent.trim().length - b.textContent.trim().length);
-                if (btns.length) btns[0].click();
-            }""")
-            page.wait_for_timeout(1500)
-
-            _llenar_citado(page, cliente)
-            page.wait_for_timeout(1000)
-            checkpoint('05_citado')
-
-            def _citado_guardado():
+            def _citados_guardados():
+                """Citados que el portal ya tiene (la página los re-renderiza
+                en `window.datosCitado` tras cada recarga)."""
                 try:
-                    return page.evaluate("() => Object.keys(window.datosCitado || {}).length > 0")
+                    return page.evaluate("""() => {
+                        const d = window.datosCitado;
+                        if (Array.isArray(d)) return d.length;
+                        // Respaldo: renglones de la tabla de citados guardados
+                        const filas = document.querySelectorAll('#divTablaCitados tbody tr');
+                        if (filas.length) return filas.length;
+                        return d && Object.keys(d).length ? 1 : 0;
+                    }""") or 0
                 except Exception:
-                    return False
+                    return 0
 
-            # Guardar citado: UN solo POST a /solicitud/store_citado y esperar
-            # la recarga. Solo si no hubo navegación se reintenta (con el mismo
-            # formulario lleno), nunca mientras la página está recargando.
-            citado_ok = False
-            for intento in (1, 2):
-                try:
-                    with page.expect_navigation(wait_until='load', timeout=30000):
-                        if intento == 1:
-                            page.locator('#frmCitado button[type="submit"]').first.click(timeout=10000)
-                        else:
-                            page.evaluate("""() => {
-                                const f = document.querySelector('#frmCitado');
-                                if (f) { f.removeAttribute('data-parsley-validate'); f.submit(); }
-                            }""")
-                    page.wait_for_timeout(1500)
-                    citado_ok = _citado_guardado()
-                    logger.info('[5] citado guardado (intento %d): %s', intento, citado_ok)
-                    break  # hubo POST; no reenviar aunque falle (el form ya se vació)
-                except Exception as e:
-                    logger.warning('[5] Guardar citado (intento %d) sin navegación: %s', intento, e)
+            for num, citado in enumerate(citados, start=1):
+                etiqueta = f'citado {num}/{len(citados)} ({citado["nombre"]})'
+                logger.info('[5] %s', etiqueta)
+                ya_guardados = _citados_guardados()
 
-            if not citado_ok:
-                # Mensaje del servidor (p. ej. "El campo solicitado.nombre es requerido")
-                try:
-                    msg = page.inner_text('body')[:300]
-                except Exception:
-                    msg = ''
-                resultado.error = '[ver7] El portal no guardó al citado (empresa).'
-                resultado.detalle = f'URL={page.url} | TEXTO={msg}'
-                checkpoint('05_citado_error')
-                browser.close()
-                return resultado
+                _navigate_wizard_tab(page, 'citado')
+                page.wait_for_timeout(800)
+
+                # El portal pregunta "¿Tienes recibos de nómina oficiales?":
+                # se contesta "No" para proceder (solo si la pregunta está visible).
+                page.evaluate("""() => {
+                    const no = document.querySelector('#recibo_oficial_no');
+                    if (no && no.offsetParent !== null) {
+                        no.checked = true; no.click();
+                        no.dispatchEvent(new Event('change', {bubbles: true}));
+                    }
+                    const no2 = document.querySelector('#recibo_pago_no');
+                    if (no2 && no2.offsetParent !== null) {
+                        no2.checked = true; no2.click();
+                        no2.dispatchEvent(new Event('change', {bubbles: true}));
+                    }
+                }""")
+                page.wait_for_timeout(500)
+
+                # Clic en "Agregar citado" (#btn_agregar_citado; por texto como respaldo)
+                page.evaluate("""() => {
+                    const directo = document.querySelector('#btn_agregar_citado');
+                    if (directo && directo.offsetParent !== null) { directo.click(); return; }
+                    const panel = document.querySelector('#stepCitado');
+                    const searchIn = panel || document;
+                    const btns = Array.from(searchIn.querySelectorAll('button, a, span'))
+                        .filter(b => b.offsetParent !== null)
+                        .filter(b => {
+                            const t = b.textContent.trim().toLowerCase();
+                            return t.includes('agregar') && t.includes('citado');
+                        });
+                    btns.sort((a, b) => a.textContent.trim().length - b.textContent.trim().length);
+                    if (btns.length) btns[0].click();
+                }""")
+                page.wait_for_timeout(1500)
+
+                _llenar_citado(page, citado)
+                page.wait_for_timeout(1000)
+                checkpoint(f'05_citado_{num}')
+
+                # Guardar citado: UN solo POST a /solicitud/store_citado y esperar
+                # la recarga. Solo si no hubo navegación se reintenta (con el mismo
+                # formulario lleno), nunca mientras la página está recargando.
+                citado_ok = False
+                for intento in (1, 2):
+                    try:
+                        with page.expect_navigation(wait_until='load', timeout=30000):
+                            if intento == 1:
+                                page.locator('#frmCitado button[type="submit"]').first.click(timeout=10000)
+                            else:
+                                page.evaluate("""() => {
+                                    const f = document.querySelector('#frmCitado');
+                                    if (f) { f.removeAttribute('data-parsley-validate'); f.submit(); }
+                                }""")
+                        page.wait_for_timeout(1500)
+                        citado_ok = _citados_guardados() > ya_guardados
+                        logger.info('[5] %s guardado (intento %d): %s', etiqueta, intento, citado_ok)
+                        break  # hubo POST; no reenviar aunque falle (el form ya se vació)
+                    except Exception as e:
+                        logger.warning('[5] Guardar %s (intento %d) sin navegación: %s', etiqueta, intento, e)
+
+                if not citado_ok:
+                    # Mensaje del servidor (p. ej. "El campo solicitado.nombre es requerido")
+                    try:
+                        msg = page.inner_text('body')[:300]
+                    except Exception:
+                        msg = ''
+                    resultado.error = (f'[ver7] El portal no guardó al {etiqueta}. '
+                                       'La solicitud NO se envió.')
+                    resultado.detalle = f'URL={page.url} | TEXTO={msg}'
+                    checkpoint(f'05_citado_{num}_error')
+                    browser.close()
+                    return resultado
 
             # Avanzar al siguiente paso
             try:

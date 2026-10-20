@@ -966,3 +966,36 @@ class FormatoTest(TestCase):
         cap = capitulos(_datos_con_expediente(), _calculo(), 'injustificado')
         self.assertEqual(cap['caratula']['accion'], 'DESPIDO INJUSTIFICADO')
         self.assertIn('TRIBUNAL LABORAL DEL ESTADO', cap['caratula']['tribunal'])
+
+
+class DemandadosAdicionalesTest(TestCase):
+    """Los demandados adicionales del cliente se agregan como numerales."""
+
+    def test_agrega_moral_y_fisica_despues_del_patron(self):
+        from expedientes.redaccion.demandados import demandados
+        numerales = demandados(_datos(demandados_adicionales=[
+            {'nombre': 'SERVICIOS ACME, S. DE R.L.', 'tipo_persona': 'moral',
+             'domicilio': 'CALLE 2 NO. 10, TIJUANA, BAJA CALIFORNIA'},
+            {'nombre': 'PEDRO RAMIREZ SOTO', 'tipo_persona': 'fisica', 'domicilio': ''},
+        ]))
+        self.assertEqual(len(numerales), 4)
+        self.assertIn('A la MORAL "SERVICIOS ACME, S. DE R.L.", ubicada en CALLE 2 NO. 10',
+                      numerales[2])
+        self.assertIn('Al C. PEDRO RAMIREZ SOTO, persona física', numerales[3])
+        # Sin domicilio propio se emplaza en el del patrón principal.
+        self.assertIn('AV. INDUSTRIAL 500', numerales[3])
+
+    def test_adaptador_lee_demandados_del_cliente(self):
+        from expedientes.models import DemandadoAdicional
+        from expedientes.redaccion import datos_de_expediente
+        cliente = Cliente.objects.create(nombre='Actor Prueba', empresa='ACME')
+        DemandadoAdicional.objects.create(cliente=cliente, nombre='Otra Empresa',
+                                          calle='Av. Uno', numero='5', cp='22000', orden=1)
+        from django.contrib.auth.models import User
+        expediente = Expediente.objects.create(
+            cliente=cliente, asesor=User.objects.create_user('asesor_extra'),
+            tipo_despido='injustificado')
+        extras = datos_de_expediente(expediente)['demandados_adicionales']
+        self.assertEqual(extras[0]['nombre'], 'OTRA EMPRESA')
+        self.assertEqual(extras[0]['domicilio'],
+                         'AV. UNO NO. 5, TIJUANA, BAJA CALIFORNIA, C.P. 22000')

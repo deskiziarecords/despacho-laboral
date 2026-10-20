@@ -279,6 +279,23 @@ def _agregar_demandado(doc: Document, expediente: Expediente) -> None:
     if cliente.empresa_actividad:
         items.append((f"Actividad: {cliente.empresa_actividad}", False))
 
+    for extra in cliente.demandados_adicionales.all():
+        items.append(("", False))
+        items.append((extra.nombre, True))
+        partes_extra = []
+        if extra.calle:
+            partes_extra.append(extra.calle)
+        if extra.numero:
+            partes_extra.append(f"#{extra.numero}")
+        if extra.colonia:
+            partes_extra.append(f"Col. {extra.colonia}")
+        if extra.cp:
+            partes_extra.append(f"CP {extra.cp}")
+        if partes_extra:
+            items.append((f"Domicilio: {', '.join(partes_extra)}", False))
+        if extra.telefono:
+            items.append((f"Teléfono: {extra.telefono}", False))
+
     for texto, negrita in items:
         p = doc.add_paragraph()
         run = p.add_run(f"  {texto}")

@@ -32,12 +32,13 @@ from django.views.generic import (
 from .forms import (ClienteForm, DocumentoForm, ExpedienteForm, NotaForm,
                        SolicitudConciliacionForm, WhatsAppMessageForm,
                        CalculoLaboralForm, SimulacionForm, MachoteForm,
-                       formularios_representacion, apoderados_de_referencia)
+                       formularios_representacion, apoderados_de_referencia,
+                       DemandadoAdicionalFormSet)
 from .models import (Cliente, Documento, Expediente, Movimiento, Nota,
                       SolicitudConciliacion, WhatsAppMessage, TareaConciliacion,
                       CalculoLaboral, LegalConfig, Aviso,
                       SolicitudTransferencia, Notificacion, Empresa,
-                      ApoderadoLegal, AutorizadoNotificacion)
+                      ApoderadoLegal, AutorizadoNotificacion, DemandadoAdicional)
 from .signals import registrar_movimiento
 
 
@@ -815,14 +816,71 @@ class ClienteListView(LoginRequiredMixin, ListView):
         return context
 
 
-class ClienteCreateView(LoginRequiredMixin, CreateView):
+class DemandadosAdicionalesMixin:
+    """Formset de demandados adicionales en el alta/edición de cliente.
+
+    El cliente y sus demandados se guardan juntos: si el formset trae errores
+    se vuelve a mostrar el formulario sin guardar nada.
+    """
+
+    def get_demandados_formset(self):
+        instancia = self.object or Cliente()
+        if self.request.method == 'POST':
+            # Un POST sin el formset (integraciones anteriores) no toca los
+            # demandados adicionales existentes.
+            if 'demandados-TOTAL_FORMS' not in self.request.POST:
+                return None
+            return DemandadoAdicionalFormSet(
+                self.request.POST, instance=instancia, prefix='demandados')
+        return DemandadoAdicionalFormSet(instance=instancia, prefix='demandados')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if context.get('demandados_formset') is None:
+            context['demandados_formset'] = DemandadoAdicionalFormSet(
+                instance=self.object or Cliente(), prefix='demandados')
+        return context
+
+    def procesar_post(self):
+        form = self.get_form()
+        formset = self.get_demandados_formset()
+        if form.is_valid() and (formset is None or formset.is_valid()):
+            return self.form_valid(form, formset)
+        return self.render_to_response(
+            self.get_context_data(form=form, demandados_formset=formset))
+
+    def guardar_demandados(self, formset):
+        """Guarda los demandados en el orden en que aparecen en pantalla."""
+        orden = 0
+        for f in formset.forms:
+            if f in formset.deleted_forms:
+                if f.instance.pk:
+                    f.instance.delete()
+                continue
+            if not f.instance.pk and not f.has_changed():
+                continue
+            orden += 1
+            demandado = f.save(commit=False)
+            demandado.cliente = self.object
+            demandado.orden = orden
+            demandado.save()
+
+
+class ClienteCreateView(LoginRequiredMixin, DemandadosAdicionalesMixin, CreateView):
     model = Cliente
     form_class = ClienteForm
     template_name = 'expedientes/cliente_form.html'
 
-    def form_valid(self, form):
+    def post(self, request, *args, **kwargs):
+        self.object = None
+        return self.procesar_post()
+
+    def form_valid(self, form, formset=None):
         form.instance.created_by = self.request.user
-        response = super().form_valid(form)
+        with transaction.atomic():
+            self.object = form.save()
+            if formset is not None:
+                self.guardar_demandados(formset)
 
         # Crear expediente automáticamente y redirigir a conciliación
         cliente = self.object
@@ -871,11 +929,22 @@ class ClienteCreateView(LoginRequiredMixin, CreateView):
         return reverse_lazy('cliente_list')
 
 
-class ClienteUpdateView(LoginRequiredMixin, UpdateView):
+class ClienteUpdateView(LoginRequiredMixin, DemandadosAdicionalesMixin, UpdateView):
     model = Cliente
     form_class = ClienteForm
     template_name = 'expedientes/cliente_form.html'
     success_url = reverse_lazy('cliente_list')
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        return self.procesar_post()
+
+    def form_valid(self, form, formset=None):
+        with transaction.atomic():
+            response = super().form_valid(form)
+            if formset is not None:
+                self.guardar_demandados(formset)
+        return response
 
     def get(self, request, *args, **kwargs):
         try:
@@ -3600,9 +3669,11 @@ def enviar_conciliacion_automation(request, pk):
         return redirect('conciliacion_procesando', task_pk=task.pk)
 
     # GET: mostrar página de confirmación
+    from .conciliacion_automation import citados_de_cliente
     return render(request, 'expedientes/conciliacion_confirmar.html', {
         'expediente': expediente,
         'ESTADO_COLORS': ESTADO_COLORS,
+        'citados': citados_de_cliente(expediente.cliente),
     })
 
 

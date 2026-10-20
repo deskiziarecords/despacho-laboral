@@ -15,6 +15,9 @@ El primer numeral cubre al patrón real (persona física o moral sin
 personalidad jurídica reconocida); el segundo a la persona moral.  Ambos se
 requieren para que la condena alcance a quien realmente explota la fuente de
 trabajo y para pedir la solidaridad cuando aplique.
+
+Después se agregan, en el orden capturado, los demandados adicionales del
+cliente (`datos['demandados_adicionales']`): personas morales o físicas.
 """
 
 
@@ -46,6 +49,24 @@ def demandados(datos: dict) -> list:
         numerales.append(
             f'A la MORAL "{razon_social}", ubicada en {domicilio}, {cierre}'
         )
+
+    # Demandados adicionales capturados en el alta del cliente.  Sin domicilio
+    # propio se emplazan en el del patrón principal.
+    for extra in datos.get('demandados_adicionales') or []:
+        nombre = (extra.get('nombre') or '').strip()
+        if not nombre:
+            continue
+        domicilio_extra = extra.get('domicilio') or domicilio
+        if extra.get('tipo_persona') == 'fisica':
+            numerales.append(
+                f'Al C. {nombre}, persona física, con domicilio en '
+                f'{domicilio_extra}, quien puede ser notificado y emplazado a '
+                f'juicio en el mismo domicilio antes mencionado.'
+            )
+        else:
+            numerales.append(
+                f'A la MORAL "{nombre}", ubicada en {domicilio_extra}, {cierre}'
+            )
 
     return numerales
 

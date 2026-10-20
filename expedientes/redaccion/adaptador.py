@@ -70,6 +70,7 @@ def datos_de_expediente(expediente) -> dict:
     datos['demandada_telefono'] = _texto(cliente.empresa_telefono)
     datos['demandada_tipo_persona'] = cliente.tipo_persona_citado or 'fisica'
     datos['demandada_representante'] = _texto(getattr(cliente, 'empresa_representante', ''))
+    datos['demandados_adicionales'] = _demandados_adicionales(cliente)
 
     # ─── Datos laborales ──────────────────────────────────────────────────
     datos['puesto'] = _texto(cliente.puesto).upper()
@@ -166,6 +167,32 @@ def _domicilio_demandada(cliente) -> str:
     if cliente.empresa_cp:
         partes.append(f'C.P. {cliente.empresa_cp}')
     return ', '.join(p.upper() for p in partes if p)
+
+
+def _demandados_adicionales(cliente) -> list:
+    """Otros demandados del cliente (además del patrón principal)."""
+    relacionados = getattr(cliente, 'demandados_adicionales', None)
+    if relacionados is None or not cliente.pk:
+        return []
+    resultado = []
+    for d in relacionados.all():
+        partes = []
+        if d.calle:
+            partes.append(f'{d.calle} NO. {d.numero}' if d.numero else d.calle)
+        if d.colonia:
+            partes.append(d.colonia)
+        if partes or d.cp:
+            partes.append('TIJUANA, BAJA CALIFORNIA')
+        if d.cp:
+            partes.append(f'C.P. {d.cp}')
+        resultado.append({
+            'nombre': _texto(d.nombre).upper(),
+            'tipo_persona': d.tipo_persona,
+            'rfc': _texto(d.rfc),
+            'telefono': _texto(d.telefono),
+            'domicilio': ', '.join(p.upper() for p in partes if p),
+        })
+    return resultado
 
 
 def _tipo_contrato_texto(valor: str) -> str:

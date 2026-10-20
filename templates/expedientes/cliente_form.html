@@ -193,6 +193,30 @@
                 </div>
             </div>
 
+            <!-- Demandados adicionales -->
+            <div id="demandados-adicionales">
+                <div class="flex items-center justify-between mb-3 border-b pb-1.5">
+                    <h2 class="text-sm font-semibold text-gray-800">Otros demandados <span class="text-xs font-normal text-gray-400">(opcional)</span></h2>
+                    <button type="button" id="btn-agregar-demandado"
+                            class="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors font-medium">
+                        + Agregar persona o empresa
+                    </button>
+                </div>
+                <p class="text-xs text-gray-400 mb-3">Si además del patrón de arriba se demanda a otra persona física o moral (otra razón social, el dueño, una empresa de outsourcing…), agrégala aquí. Si no capturas domicilio se usará el del patrón principal.</p>
+                {{ demandados_formset.management_form }}
+                {% if demandados_formset.non_form_errors %}
+                <p class="text-red-500 text-xs mb-2">{{ demandados_formset.non_form_errors.0 }}</p>
+                {% endif %}
+                <div id="demandados-lista" class="space-y-3">
+                    {% for f in demandados_formset %}
+                    {% include 'expedientes/_demandado_adicional_form.html' with f=f %}
+                    {% endfor %}
+                </div>
+                <template id="demandado-plantilla">
+                    {% include 'expedientes/_demandado_adicional_form.html' with f=demandados_formset.empty_form %}
+                </template>
+            </div>
+
             <!-- Información Laboral -->
             <div>
                 <h2 class="text-sm font-semibold text-gray-800 mb-3 border-b pb-1.5">Información Laboral</h2>
@@ -315,6 +339,47 @@
     toggleCurp();
     tipoSelect.addEventListener('change', toggleCurp);
   }
+})();
+
+(function() {
+  const lista = document.getElementById('demandados-lista');
+  const plantilla = document.getElementById('demandado-plantilla');
+  const total = document.getElementById('id_demandados-TOTAL_FORMS');
+  const boton = document.getElementById('btn-agregar-demandado');
+  if (!lista || !plantilla || !total || !boton) return;
+
+  function renumerar() {
+    let n = 0;
+    lista.querySelectorAll('[data-demandado]').forEach(function(card) {
+      if (card.style.display === 'none') return;
+      n += 1;
+      const etiqueta = card.querySelector('[data-demandado-num]');
+      if (etiqueta) etiqueta.textContent = n;
+    });
+  }
+
+  boton.addEventListener('click', function() {
+    const idx = parseInt(total.value, 10) || 0;
+    const html = plantilla.innerHTML.replace(/__prefix__/g, idx);
+    lista.insertAdjacentHTML('beforeend', html);
+    total.value = idx + 1;
+    renumerar();
+    const nuevo = lista.lastElementChild;
+    const nombre = nuevo && nuevo.querySelector('input[name$="-nombre"]');
+    if (nombre) nombre.focus();
+  });
+
+  lista.addEventListener('click', function(ev) {
+    const btn = ev.target.closest('[data-quitar-demandado]');
+    if (!btn) return;
+    const card = btn.closest('[data-demandado]');
+    const borrar = card.querySelector('input[name$="-DELETE"]');
+    if (borrar) borrar.checked = true;
+    card.style.display = 'none';
+    renumerar();
+  });
+
+  renumerar();
 })();
 </script>
 {% endblock %}

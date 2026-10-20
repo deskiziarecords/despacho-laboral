@@ -59,6 +59,20 @@
                         <p class="font-medium">{{ expediente.folio|default:'—' }}</p>
                     </div>
                 </div>
+                <div class="mt-4">
+                    <span class="text-gray-500 text-xs">Citados que se registrarán en el portal ({{ citados|length }})</span>
+                    <ol class="mt-1 space-y-1 text-sm list-decimal list-inside">
+                        {% for c in citados %}
+                        <li>
+                            <span class="font-medium">{{ c.nombre }}</span>
+                            <span class="text-xs text-gray-500">— {% if c.tipo_persona == 'moral' %}Persona moral{% else %}Persona física{% endif %}{% if c.calle or c.cp %} · {{ c.calle }} {{ c.numero }}{% if c.cp %}, CP {{ c.cp }}{% endif %}{% endif %}</span>
+                        </li>
+                        {% endfor %}
+                    </ol>
+                    {% if citados|length == 1 %}
+                    <p class="text-xs text-gray-400 mt-1">Para citar a otra persona o empresa (p. ej. oficinas en otro domicilio), agrégala en "Otros demandados" al editar el cliente.</p>
+                    {% endif %}
+                </div>
             </div>
 
             {% if expediente.folio %}
